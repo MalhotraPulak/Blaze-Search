@@ -1,3 +1,4 @@
+import pprint
 import time
 import _pickle as pickle
 import sys
@@ -52,7 +53,6 @@ doc_id = 0
 token_count = 0
 
 
-
 def clean(txt):
     txt = txt.replace("\n", " ").replace("\r", " ")
     punc_list = '!"#$&*+,-./;?@\^_~)('
@@ -90,8 +90,8 @@ def stri(lst):
 
 scores = {}
 # stores returned postings of all encountered tokens
-id_to_title = {}
-doc_cnt = len(id_to_title.keys())
+# id_to_title = {}
+# doc_cnt = len(id_to_title.keys())
 # Total number of docs encountered in the dump
 
 doc_score = {}
@@ -106,7 +106,7 @@ def get_token_scores(word):
 
 # title: 0, infobox: 1, body: 2, categories: 3, references: 4, external_links: 5
 
-def field_query(query, K):
+def field_query(query):
     # t:World Cup i:2019 c:Cricket
     units = query.split(" ")
     token_query = [[], [], [], [], [], []]
@@ -140,55 +140,37 @@ def field_query(query, K):
         else:
             token_query[flag] += all_tokens
         tokens += all_tokens
-
+    print(tokens)
+    ans = {}
     for token in tokens:
-        scores[token] = get_token_scores(token)
-        for field in range(6):
-            for doc in scores[token][field]:
-                temp = (1 + math.log(doc[1])) * math.log(doc_cnt / scores[token][6][field])
-                if token in token_query[field]:
-                    temp *= field_match_reward
-                if doc[0] not in doc_score:
-                    doc_score[doc[0]] = 0
-                doc_score[doc[0]] += temp
-
-    processed = 0
-    for elem in (sorted(doc_score.items(), key=lambda kv: (kv[1], kv[0]), reverse=True)):
-
-        if elem[0] in id_to_title:
-            print(str(elem[0]) + ", " + id_to_title[elem[0]].lower())
-        else:
-            print(str(elem[0])) + ", " + "_"
-
-        processed += 1
-        if processed == K:
-            break
+        # title: 0, infobox: 1, body: 2, categories: 3, references: 4, external_links: 5
+        ans[token] = {}
+        dic_token = dic[token]
+        ans[token]["title"] = dic_token[0]
+        ans[token]["body"] = dic_token[5]
+        ans[token]["infobox"] = dic_token[1]
+        ans[token]["categories"] = dic_token[2]
+        ans[token]["references"] = dic_token[3]
+        ans[token]["links"] = dic_token[4]
+    print(ans)
 
 
-query_file = sys.argv[1]
-
-file = open(query_file, "r+").read().split("\n")
-
-for line in file:
+def main():
+    query_string = sys.argv[1]
+    print(query_string)
+    global dic
     try:
         for word in stopword:
             word_set[word] = None
-        # load id to title mapping
-        print("Loading id to title mapping")
-        file_id = open("/output/id_to_title.pickle", "rb")
-        id_to_title = pickle.load(file_id)
-        # load index in memory
-        print("Loading index in memory")
-        with open("output/index.pkl") as file:
+        with open("./output/index.pkl", "rb+") as file:
             dic = pickle.load(file)
         print("Done loading index in memory")
-        doc_score = {}
-        start = time.time()
-        K, query = line.split(", ")
-        K = int(K)
-        field_query(query, K)
-        end = time.time()
-        print(str(end - start) + ", " + str((end - start) / K))
+        field_query(query_string)
         print()
-    except:
-        "Aww Snap. Some Error Occured. :/"
+    except Exception as e:
+        print(e)
+        print("Aww Snap. Some Error Occured. :/")
+
+
+if __name__ == "__main__":
+    main()

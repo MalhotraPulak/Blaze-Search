@@ -97,7 +97,7 @@ def regtok(txt):
 
 
 def addTokensToIndex(tokens, pos):
-    global totalToken, doc_id, indexed_dict
+    global doc_id, indexed_dict
 
     for unkey in tokens:
         key = strip_accents(unkey)
@@ -197,12 +197,13 @@ class WikiParser(xml.sax.handler.ContentHandler):
 
 def main():
     dump_location, output_folder, stats_file = sys.argv[1], sys.argv[2], sys.argv[3]
+    print(dump_location, output_folder, stats_file)
     for word in stopword:
         word_set[word] = None
     handler = WikiParser()
     parser = xml.sax.make_parser()
     parser.setContentHandler(handler)
-    parser.parse("wiki.xml")
+    parser.parse(dump_location)
     print("writing pickle file")
     if output_folder[-1] == '/':
         output_folder = output_folder[:-1]
