@@ -1,13 +1,36 @@
 import pickle
 import xml.sax
-from typing import List, Optional
+from typing import Optional
 import nltk
 from enum import Enum
-from page import Page
 from nltk.corpus import stopwords
 from nltk.stem import SnowballStemmer
 import re
 import unicodedata
+
+
+class Page:
+    def __init__(self, doc_no):
+        self.id = ""
+        self.doc_no: int = doc_no
+        self.title = ""
+        self.infobox = ""
+        self.category = ""
+        self.links = ""
+        self.references = ""
+        self.body = ""
+
+    def __str__(self):
+        print("----Doc---")
+        print("Id", self.id)
+        print("Titl", self.title)
+        print("Info", self.infobox)
+        print("Cat", self.category)
+        print("Links", self.links)
+        print("Refs", self.references)
+        print("----End Doc---")
+        return ""
+
 
 TAG_MEDIA_WIKI = "mediawiki"
 TAG_PAGE = "page"
@@ -17,7 +40,9 @@ TAG_TITLE = "title"
 BATCH_SIZE = 100
 
 
-def isEN(s):
+def shortAndEnglish(s):
+    if len(s) > 20:
+        return False
     try:
         s.encode(encoding='utf-8').decode('ascii')
     except UnicodeDecodeError:
@@ -40,7 +65,7 @@ word_set = {}
 
 indexed_dict = {}
 doc_id = 0
-
+id_to_title = {}
 
 
 def stem(token):
@@ -58,7 +83,6 @@ def clean(txt):
     txt = txt.translate(t)
     t = str.maketrans(dict.fromkeys("'`", ""))
     txt = txt.translate(t)
-
     return txt
 
 
@@ -67,7 +91,6 @@ def regtok(txt):
     regex = re.compile(r'(\d+|\s+|=|}}|\|)')
     tokens = [stem(token) for token in regex.split(txt) if
               token not in word_set and (token.isalnum() or token == '}}' or token == '{{infobox')]
-    # tokens = regexp_tokenize(txt, pattern = '\s+', gaps = True)
     return tokens
 
 
@@ -95,19 +118,23 @@ class WikiParser(xml.sax.handler.ContentHandler):
         global totalToken
         global doc_id
         global indexed_dict
+        global id_to_title
         info_tokens = []
         link_tokens = []
+        body_tokens = []
         body_flag = True
         link_flag = False
         info_flag = False
-        print(self.currentPage.doc_no)
-
-        body_tokens = regtok(self.currentPage.body)
+        id_to_title[self.currentPage.doc_no] = self.currentPage.title
+        if self.currentPage.doc_no % 1000 == 0:
+            print(self.currentPage.doc_no)
+        tokens = regtok(self.currentPage.body)
         categories_str = re.findall('(?<=\[\[category:)(.*?)(?=\]\])', self.currentPage.body)
         ref_type_1 = re.findall('(?<=\* \[\[)(.*?)(?=\])', self.currentPage.body)
         ref_type_2 = re.findall('(?<=\* \{\{)(.*?)(?=\}\})', self.currentPage.body)
         category_tokens = []
         title_tokens = regtok(self.currentPage.title)
+
         for stri in categories_str:
             all_tok = regtok(stri)
             for tok in all_tok:
@@ -124,7 +151,7 @@ class WikiParser(xml.sax.handler.ContentHandler):
             for tok in all_tok:
                 refer_tokens.append(tok)
 
-        for token in body_tokens:
+        for token in tokens:
             totalToken += 1
             if token == '{{infobox':
                 info_flag = True
@@ -153,7 +180,7 @@ class WikiParser(xml.sax.handler.ContentHandler):
 
         for unkey in refer_tokens:
             key = strip_accents(unkey)
-            if isEN(key) == False or key.isalnum() == False:
+            if not shortAndEnglish(key) or not key.isalnum():
                 continue
             if key not in indexed_dict:
                 indexed_dict[key] = [[], [], [], [], [], [], [0, 0, 0, 0, 0, 0]]
@@ -166,7 +193,7 @@ class WikiParser(xml.sax.handler.ContentHandler):
 
         for unkey in category_tokens:
             key = strip_accents(unkey)
-            if isEN(key) == False or key.isalnum() == False:
+            if not shortAndEnglish(key) or not key.isalnum():
                 continue
             if key not in indexed_dict:
                 indexed_dict[key] = [[], [], [], [], [], [], [0, 0, 0, 0, 0, 0]]
@@ -179,7 +206,7 @@ class WikiParser(xml.sax.handler.ContentHandler):
 
         for unkey in body_tokens:
             key = strip_accents(unkey)
-            if isEN(key) == False or key.isalnum() == False:
+            if not shortAndEnglish(key) or not key.isalnum():
                 continue
             if key not in indexed_dict:
                 indexed_dict[key] = [[], [], [], [], [], [], [0, 0, 0, 0, 0, 0]]
@@ -192,7 +219,7 @@ class WikiParser(xml.sax.handler.ContentHandler):
 
         for unkey in link_tokens:
             key = strip_accents(unkey)
-            if isEN(key) == False or key.isalnum() == False:
+            if not shortAndEnglish(key) or not key.isalnum():
                 continue
             if key not in indexed_dict:
                 indexed_dict[key] = [[], [], [], [], [], [], [0, 0, 0, 0, 0, 0]]
@@ -205,7 +232,7 @@ class WikiParser(xml.sax.handler.ContentHandler):
 
         for unkey in info_tokens:
             key = strip_accents(unkey)
-            if isEN(key) == False or key.isalnum() == False:
+            if not shortAndEnglish(key) or not key.isalnum():
                 continue
             if key not in indexed_dict:
                 indexed_dict[key] = [[], [], [], [], [], [], [0, 0, 0, 0, 0, 0]]
@@ -218,7 +245,7 @@ class WikiParser(xml.sax.handler.ContentHandler):
 
         for unkey in title_tokens:
             key = strip_accents(unkey)
-            if isEN(key) == False or key.isalnum() == False:
+            if not shortAndEnglish(key) or not key.isalnum():
                 continue
             totalToken += 1
             if key not in indexed_dict:
@@ -247,6 +274,8 @@ def main():
     print("writing pickle file")
     pickle_out = open("./output/index.pkl", "wb+")
     pickle.dump(indexed_dict, pickle_out)
+    pickle_out = open("./output/id_to_title.pickle", "wb")
+    pickle.dump(id_to_title, pickle_out)
 
 
 if __name__ == "__main__":
