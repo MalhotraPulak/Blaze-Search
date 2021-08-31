@@ -2,11 +2,12 @@ import pickle
 import xml.sax
 from typing import Optional
 import nltk
-from enum import Enum
 from nltk.corpus import stopwords
 from nltk.stem import SnowballStemmer
 import re
 import unicodedata
+import sys
+import json
 
 
 class Page:
@@ -37,12 +38,9 @@ TAG_PAGE = "page"
 TAG_ID = "id"
 TAG_TEXT = "text"
 TAG_TITLE = "title"
-BATCH_SIZE = 100
 
 
 def shortAndEnglish(s):
-    if len(s) > 20:
-        return False
     try:
         s.encode(encoding='utf-8').decode('ascii')
     except UnicodeDecodeError:
@@ -77,6 +75,7 @@ def stem(token):
 
 
 def clean(txt):
+    txt = txt.lower()
     txt = txt.replace("\n", " ").replace("\r", " ")
     punc_list = '!"#$&*+,-./;?@\^_~)('
     t = str.maketrans(dict.fromkeys(punc_list, " "))
@@ -89,15 +88,17 @@ def clean(txt):
 def regtok(txt):
     txt = clean(txt)
     regex = re.compile(r'(\d+|\s+|=|}}|\|)')
-    tokens = [stem(token) for token in regex.split(txt) if
+    tokens = [token for token in regex.split(txt)]
+    global totalToken
+    totalToken += len(tokens)
+    tokens = [stem(token) for token in tokens if
               token not in word_set and (token.isalnum() or token == '}}' or token == '{{infobox')]
     return tokens
 
 
 def addTokensToIndex(tokens, pos):
     global totalToken, doc_id, indexed_dict
-    if pos == 0 or pos == 2:
-        totalToken += len(tokens)
+
     for unkey in tokens:
         key = strip_accents(unkey)
         if not shortAndEnglish(key) or not key.isalnum():
@@ -120,14 +121,13 @@ class WikiParser(xml.sax.handler.ContentHandler):
         self.CurrentData = tag
         global doc_id
         if tag == TAG_PAGE:
-            # make sure this is copy by reference
             self.currentPage = Page(doc_id)
             doc_id += 1
 
     def endElement(self, tag):
         if tag != TAG_PAGE:
             return
-        global id_to_title
+        global id_to_title, totalToken
         info_tokens = []
         link_tokens = []
         body_tokens = []
@@ -146,19 +146,14 @@ class WikiParser(xml.sax.handler.ContentHandler):
 
         for stri in categories_str:
             all_tok = regtok(stri)
-            for tok in all_tok:
-                category_tokens.append(tok)
+            category_tokens.extend(all_tok)
 
         refer_tokens = []
         for stri in ref_type_1:
-            all_tok = regtok(stri)
-            for tok in all_tok:
-                refer_tokens.append(tok)
+            refer_tokens.extend(regtok(stri))
 
         for stri in ref_type_2:
-            all_tok = regtok(stri)
-            for tok in all_tok:
-                refer_tokens.append(tok)
+            refer_tokens.extend(regtok(stri))
 
         for token in tokens:
             if token == '{{infobox':
@@ -201,6 +196,7 @@ class WikiParser(xml.sax.handler.ContentHandler):
 
 
 def main():
+    dump_location, output_folder, stats_file = sys.argv[1], sys.argv[2], sys.argv[3]
     for word in stopword:
         word_set[word] = None
     handler = WikiParser()
@@ -208,13 +204,16 @@ def main():
     parser.setContentHandler(handler)
     parser.parse("wiki.xml")
     print("writing pickle file")
-    new_index = {}
-    for key, value in indexed_dict.items():
-        new_index[key] = value[0:len(value) - 1]
-    pickle_out = open("./output/index.pkl", "wb+")
-    pickle.dump(new_index, pickle_out)
-    pickle_out = open("./output/id_to_title.pickle", "wb")
+    if output_folder[-1] == '/':
+        output_folder = output_folder[:-1]
+    pickle_out = open(f"{output_folder}/index.pkl", "wb+")
+    pickle.dump(indexed_dict, pickle_out)
+    pickle_out = open(f"{output_folder}/id_to_title.pickle", "wb")
     pickle.dump(id_to_title, pickle_out)
+    with open(stats_file, "w+") as text_file:
+        text_file.write(f"{totalToken}\n{len(indexed_dict)}")
+    with open("keys.txt", "w+") as text_file:
+        json.dump(list(sorted(indexed_dict.keys())), text_file)
 
 
 if __name__ == "__main__":
