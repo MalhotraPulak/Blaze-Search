@@ -23,12 +23,12 @@ class Page:
 
     def __str__(self):
         print("----Doc---")
-        print("Id", self.id)
+        print("Doc no", self.doc_no)
         print("Titl", self.title)
-        print("Info", self.infobox)
-        print("Cat", self.category)
-        print("Links", self.links)
-        print("Refs", self.references)
+        # print("Info", self.infobox)
+        # print("Cat", self.category)
+        # print("Links", self.links)
+        # print("Refs", self.references)
         print("----End Doc---")
         return ""
 
@@ -92,21 +92,38 @@ def regtok(txt):
     global totalToken
     totalToken += len(tokens)
     tokens = [stem(token) for token in tokens if
-              token not in word_set and (token.isalnum() or token == '}}' or token == '{{infobox')]
+              token not in word_set and (
+                      token.isalnum() or token == '}}' or token == '{{infobox' or token.startswith("{{"))]
     return tokens
 
 
-def addTokensToIndex(tokens, pos):
-    global doc_id, indexed_dict
-
+def addTokensToIndex(tokens, pos, idx):
+    global indexed_dict
     for unkey in tokens:
         key = strip_accents(unkey)
         if not shortAndEnglish(key) or not key.isalnum():
             continue
         if key not in indexed_dict:
             indexed_dict[key] = [[], [], [], [], [], []]
-        if not indexed_dict[key][pos] or indexed_dict[key][pos][-1] != doc_id:
-            indexed_dict[key][pos].append(doc_id)
+        if not indexed_dict[key][pos] or indexed_dict[key][pos][-1] != idx:
+            indexed_dict[key][pos].append(idx)
+
+
+def getInfobox(text):
+    string = ""
+    regex = re.compile('{{ ?Infobox ', re.I)
+    segs = regex.split(text)[1:]
+
+    if len(segs):
+        split = re.split('}}', segs[-1])
+        for j in split:
+            if '{{' not in j:
+                segs[-1] = j
+                break
+
+        string = '\n'.join(segs)
+
+    return string
 
 
 # title: 0, infobox: 1, body: 2, categories: 3, references: 4, external_links: 5
@@ -127,35 +144,45 @@ class WikiParser(xml.sax.handler.ContentHandler):
     def endElement(self, tag):
         if tag != TAG_PAGE:
             return
-        global id_to_title, totalToken
+        # global id_to_title, totalToken
+        global totalToken
         info_tokens = []
         link_tokens = []
         body_tokens = []
         body_flag = True
         link_flag = False
         info_flag = False
-        id_to_title[self.currentPage.doc_no] = self.currentPage.title
+        # id_to_title[self.currentPage.doc_no] = self.currentPage.title
+        print(self.currentPage)
         if self.currentPage.doc_no % 1000 == 0:
             print(self.currentPage.doc_no)
-        tokens = regtok(self.currentPage.body)
-        categories_str = re.findall('(?<=\[\[category:)(.*?)(?=\]\])', self.currentPage.body)
+        self.currentPage.body = self.currentPage.body.replace("==External links==", "externallink")
+
+        categories_str = re.findall('(?<=\[\[Category:)(.*?)(?=\]\])', self.currentPage.body)
         ref_type_1 = re.findall('(?<=\* \[\[)(.*?)(?=\])', self.currentPage.body)
-        ref_type_2 = re.findall('(?<=\* \{\{)(.*?)(?=\}\})', self.currentPage.body)
+        ref_type_3 = re.findall(r'<ref[^>]*>(.+?)</ref>', self.currentPage.body)
+        infobox = getInfobox(self.currentPage.body)
+        # print("Infobox", infobox)
+        # print("Ref type1", ref_type_1)
+        # print("Ref type3", ref_type_3)
+        all_refs = ref_type_1 + ref_type_3
+        # print("References", all_refs)
+        # print("Categories", categories_str)
         category_tokens = []
         title_tokens = regtok(self.currentPage.title)
 
+        # find all
         for stri in categories_str:
             all_tok = regtok(stri)
             category_tokens.extend(all_tok)
 
         refer_tokens = []
-        for stri in ref_type_1:
+        for stri in all_refs:
             refer_tokens.extend(regtok(stri))
 
-        for stri in ref_type_2:
-            refer_tokens.extend(regtok(stri))
-
+        tokens = regtok(self.currentPage.body)
         for token in tokens:
+            # print(token)
             if token == '{{infobox':
                 info_flag = True
                 body_flag = False
@@ -181,12 +208,14 @@ class WikiParser(xml.sax.handler.ContentHandler):
             elif link_flag is True and info_flag is False:
                 link_tokens.append(token)
 
-        addTokensToIndex(title_tokens, 0)
-        addTokensToIndex(info_tokens, 1)
-        addTokensToIndex(body_tokens, 2)
-        addTokensToIndex(category_tokens, 3)
-        addTokensToIndex(refer_tokens, 4)
-        addTokensToIndex(link_tokens, 5)
+        print("Link tokens", link_tokens)
+        idx = self.currentPage.doc_no
+        addTokensToIndex(title_tokens, 0, idx)
+        addTokensToIndex(info_tokens, 1, idx)
+        addTokensToIndex(body_tokens, 2, idx)
+        addTokensToIndex(category_tokens, 3, idx)
+        addTokensToIndex(refer_tokens, 4, idx)
+        addTokensToIndex(link_tokens, 5, idx)
 
     def characters(self, content):
         if self.CurrentData == TAG_TEXT:
@@ -209,12 +238,12 @@ def main():
         output_folder = output_folder[:-1]
     pickle_out = open(f"{output_folder}/index.pkl", "wb+")
     pickle.dump(indexed_dict, pickle_out)
-    pickle_out = open(f"{output_folder}/id_to_title.pickle", "wb")
-    pickle.dump(id_to_title, pickle_out)
+    # pickle_out = open(f"{output_folder}/id_to_title.pickle", "wb+")
+    # pickle.dump(id_to_title, pickle_out)
     with open(stats_file, "w+") as text_file:
         text_file.write(f"{totalToken}\n{len(indexed_dict)}")
-    with open("keys.txt", "w+") as text_file:
-        json.dump(list(sorted(indexed_dict.keys())), text_file)
+    # with open("keys.txt", "w+") as text_file:
+    #     json.dump(list(sorted(indexed_dict.keys())), text_file)
 
 
 if __name__ == "__main__":
