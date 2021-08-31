@@ -94,9 +94,21 @@ def regtok(txt):
     return tokens
 
 
-class IndexItems(Enum):
-    FREQ_ALL, FREQ_TITLE, FREQ_BODY, FREQ_REFS, FREQ_LINK, FREQ_CAT, FREQ_INFO, TOTAL_INDEX_TIMES = range(8)
+def addTokensToIndex(tokens, pos):
+    global totalToken, doc_id, indexed_dict
+    if pos == 0 or pos == 2:
+        totalToken += len(tokens)
+    for unkey in tokens:
+        key = strip_accents(unkey)
+        if not shortAndEnglish(key) or not key.isalnum():
+            continue
+        if key not in indexed_dict:
+            indexed_dict[key] = [[], [], [], [], [], []]
+        if not indexed_dict[key][pos] or indexed_dict[key][pos][-1] != doc_id:
+            indexed_dict[key][pos].append(doc_id)
 
+
+# title: 0, infobox: 1, body: 2, categories: 3, references: 4, external_links: 5
 
 class WikiParser(xml.sax.handler.ContentHandler):
     def __init__(self):
@@ -115,9 +127,6 @@ class WikiParser(xml.sax.handler.ContentHandler):
     def endElement(self, tag):
         if tag != TAG_PAGE:
             return
-        global totalToken
-        global doc_id
-        global indexed_dict
         global id_to_title
         info_tokens = []
         link_tokens = []
@@ -152,7 +161,6 @@ class WikiParser(xml.sax.handler.ContentHandler):
                 refer_tokens.append(tok)
 
         for token in tokens:
-            totalToken += 1
             if token == '{{infobox':
                 info_flag = True
                 body_flag = False
@@ -178,84 +186,12 @@ class WikiParser(xml.sax.handler.ContentHandler):
             elif link_flag is True and info_flag is False:
                 link_tokens.append(token)
 
-        for unkey in refer_tokens:
-            key = strip_accents(unkey)
-            if not shortAndEnglish(key) or not key.isalnum():
-                continue
-            if key not in indexed_dict:
-                indexed_dict[key] = [[], [], [], [], [], [], [0, 0, 0, 0, 0, 0]]
-
-            indexed_dict[key][6][4] += 1
-            if not indexed_dict[key][4] or indexed_dict[key][4][-1][0] != doc_id:
-                indexed_dict[key][4].append([doc_id, 1])
-            else:
-                indexed_dict[key][4][-1][1] += 1
-
-        for unkey in category_tokens:
-            key = strip_accents(unkey)
-            if not shortAndEnglish(key) or not key.isalnum():
-                continue
-            if key not in indexed_dict:
-                indexed_dict[key] = [[], [], [], [], [], [], [0, 0, 0, 0, 0, 0]]
-
-            indexed_dict[key][6][3] += 1
-            if not indexed_dict[key][3] or indexed_dict[key][3][-1][0] != doc_id:
-                indexed_dict[key][3].append([doc_id, 1])
-            else:
-                indexed_dict[key][3][-1][1] += 1
-
-        for unkey in body_tokens:
-            key = strip_accents(unkey)
-            if not shortAndEnglish(key) or not key.isalnum():
-                continue
-            if key not in indexed_dict:
-                indexed_dict[key] = [[], [], [], [], [], [], [0, 0, 0, 0, 0, 0]]
-
-            indexed_dict[key][6][2] += 1
-            if not indexed_dict[key][2] or indexed_dict[key][2][-1][0] != doc_id:
-                indexed_dict[key][2].append([doc_id, 1])
-            else:
-                indexed_dict[key][2][-1][1] += 1
-
-        for unkey in link_tokens:
-            key = strip_accents(unkey)
-            if not shortAndEnglish(key) or not key.isalnum():
-                continue
-            if key not in indexed_dict:
-                indexed_dict[key] = [[], [], [], [], [], [], [0, 0, 0, 0, 0, 0]]
-
-            indexed_dict[key][6][5] += 1
-            if not indexed_dict[key][5] or indexed_dict[key][5][-1][0] != doc_id:
-                indexed_dict[key][5].append([doc_id, 1])
-            else:
-                indexed_dict[key][5][-1][1] += 1
-
-        for unkey in info_tokens:
-            key = strip_accents(unkey)
-            if not shortAndEnglish(key) or not key.isalnum():
-                continue
-            if key not in indexed_dict:
-                indexed_dict[key] = [[], [], [], [], [], [], [0, 0, 0, 0, 0, 0]]
-
-            indexed_dict[key][6][1] += 1
-            if not indexed_dict[key][1] or indexed_dict[key][1][-1][0] != doc_id:
-                indexed_dict[key][1].append([doc_id, 1])
-            else:
-                indexed_dict[key][1][-1][1] += 1
-
-        for unkey in title_tokens:
-            key = strip_accents(unkey)
-            if not shortAndEnglish(key) or not key.isalnum():
-                continue
-            totalToken += 1
-            if key not in indexed_dict:
-                indexed_dict[key] = [[], [], [], [], [], [], [0, 0, 0, 0, 0, 0]]
-
-            indexed_dict[key][6][0] += 1
-            if not indexed_dict[key][0] or indexed_dict[key][0][-1][0] != doc_id:
-                indexed_dict[key][0].append([doc_id, 1])
-            else:
-                indexed_dict[key][0][-1][1] += 1
+        addTokensToIndex(title_tokens, 0)
+        addTokensToIndex(info_tokens, 1)
+        addTokensToIndex(body_tokens, 2)
+        addTokensToIndex(category_tokens, 3)
+        addTokensToIndex(refer_tokens, 4)
+        addTokensToIndex(link_tokens, 5)
 
     def characters(self, content):
         if self.CurrentData == TAG_TEXT:
@@ -272,8 +208,11 @@ def main():
     parser.setContentHandler(handler)
     parser.parse("wiki.xml")
     print("writing pickle file")
+    new_index = {}
+    for key, value in indexed_dict.items():
+        new_index[key] = value[0:len(value) - 1]
     pickle_out = open("./output/index.pkl", "wb+")
-    pickle.dump(indexed_dict, pickle_out)
+    pickle.dump(new_index, pickle_out)
     pickle_out = open("./output/id_to_title.pickle", "wb")
     pickle.dump(id_to_title, pickle_out)
 
