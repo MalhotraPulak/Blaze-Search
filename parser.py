@@ -7,7 +7,9 @@ from nltk.stem import SnowballStemmer
 import re
 import unicodedata
 import sys
-import json
+
+
+# import json
 
 
 class Page:
@@ -63,7 +65,9 @@ word_set = {}
 
 indexed_dict = {}
 doc_id = 0
-id_to_title = {}
+
+
+# id_to_title = {}
 
 
 def stem(token):
@@ -76,24 +80,22 @@ def stem(token):
 
 def clean(txt):
     txt = txt.lower()
-    txt = txt.replace("\n", " ").replace("\r", " ")
-    punc_list = '!"#$&*+,-./;?@\^_~)('
+    punc_list = '\n\r\!"#$&*+,-./;?@\^_~)({}[]'
     t = str.maketrans(dict.fromkeys(punc_list, " "))
     txt = txt.translate(t)
-    t = str.maketrans(dict.fromkeys("'`", ""))
+    t = str.maketrans(dict.fromkeys("`", ""))
     txt = txt.translate(t)
     return txt
 
 
 def regtok(txt):
     txt = clean(txt)
-    regex = re.compile(r'(\d+|\s+|=|}}|\|)')
+    regex = re.compile(r'(\d+|\s+|=|\|)')
     tokens = [token for token in regex.split(txt)]
     global totalToken
     totalToken += len(tokens)
     tokens = [stem(token) for token in tokens if
-              token not in word_set and (
-                      token.isalnum() or token == '}}' or token == '{{infobox' or token.startswith("{{"))]
+              token not in word_set and token.isalnum()]
     return tokens
 
 
@@ -146,14 +148,11 @@ class WikiParser(xml.sax.handler.ContentHandler):
             return
         # global id_to_title, totalToken
         global totalToken
-        info_tokens = []
         link_tokens = []
         body_tokens = []
-        body_flag = True
-        link_flag = False
-        info_flag = False
+        # TODO fix total tokens count
         # id_to_title[self.currentPage.doc_no] = self.currentPage.title
-        print(self.currentPage)
+        # print(self.currentPage)
         if self.currentPage.doc_no % 1000 == 0:
             print(self.currentPage.doc_no)
         self.currentPage.body = self.currentPage.body.replace("==External links==", "externallink")
@@ -169,7 +168,6 @@ class WikiParser(xml.sax.handler.ContentHandler):
         # print("References", all_refs)
         # print("Categories", categories_str)
         category_tokens = []
-        title_tokens = regtok(self.currentPage.title)
 
         # find all
         for stri in categories_str:
@@ -181,35 +179,23 @@ class WikiParser(xml.sax.handler.ContentHandler):
             refer_tokens.extend(regtok(stri))
 
         tokens = regtok(self.currentPage.body)
-        for token in tokens:
-            # print(token)
-            if token == '{{infobox':
-                info_flag = True
-                body_flag = False
-                continue
+        # print("Tokens", tokens)
+        body_flag = True
+        link_flag = False
 
+        for token in tokens:
             if token == 'externallink':
                 link_flag = True
                 body_flag = False
                 continue
-
-            if info_flag is False and link_flag is False:
-                body_flag = True
-
-            if info_flag is True:
-                if token == '}}':
-                    info_flag = False
-                    continue
-                info_tokens.append(token)
-
-            elif body_flag is True:
+            if body_flag is True:
                 body_tokens.append(token)
-
-            elif link_flag is True and info_flag is False:
+            elif link_flag is True:
                 link_tokens.append(token)
 
-        print("Link tokens", link_tokens)
         idx = self.currentPage.doc_no
+        title_tokens = regtok(self.currentPage.title)
+        info_tokens = regtok(infobox)
         addTokensToIndex(title_tokens, 0, idx)
         addTokensToIndex(info_tokens, 1, idx)
         addTokensToIndex(body_tokens, 2, idx)
