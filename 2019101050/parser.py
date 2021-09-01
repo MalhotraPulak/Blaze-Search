@@ -20,14 +20,9 @@ all_tokens = set()
 
 class Page:
     def __init__(self, doc_no):
-        self.id = ""
         self.doc_no: int = doc_no
-        self.title = ""
-        self.infobox = ""
-        self.category = ""
-        self.links = ""
-        self.references = ""
-        self.body = ""
+        self.title = []
+        self.body = []
 
     def __str__(self):
         print("----Doc---")
@@ -152,24 +147,31 @@ class WikiParser(xml.sax.handler.ContentHandler):
         if tag != TAG_PAGE:
             return
         # global id_to_title, totalToken
-        link_tokens = []
-        body_tokens = []
+
         # id_to_title[self.currentPage.doc_no] = self.currentPage.title
-        print(self.currentPage)
+        # print(self.currentPage)
         if self.currentPage.doc_no % 1000 == 0:
             print(self.currentPage.doc_no)
-        self.currentPage.body = self.currentPage.body.replace("==External links==", START_LINK)
+        body = ' '.join(self.currentPage.body)
 
-        categories_str = re.findall('(?<=\[\[Category:)(.*?)(?=\]\])', self.currentPage.body)
-        # ref_type_1 = re.findall('(?<=\* \[\[)(.*?)(?=\])', self.currentPage.body)
-        ref_type_3 = re.findall(r'<ref[^>]*>(.+?)</ref>', self.currentPage.body)
+        body = body.replace("==External links==", START_LINK)
+
+        categories_str = re.findall('(?<=\[\[Category:)(.*?)(?=\]\])', body)
+        ref_type_1 = []
+        # print("ref type 1 ", ref_type_1)
+        ref_type_3 = re.findall(r'<ref(.+?)>', body)
+        lis = re.split(r"==References==|== References ==|== references ==|==references==", body, 1)
+        if len(lis) > 1:
+            ref_type_1 = [re.split(r"==|<|\[\[", lis[1])[0]]
+        # ref_type_3 = re.findall(r'&lt;ref name=(.+?)&gt;', body)
+        # ref_type_3 = re.findall(r'&lt;ref name=&quot;(.+?)&quot;', body)
         # print(self.currentPage)
         # print(ref_type_1)
-        infobox = getInfobox(self.currentPage.body)
+        infobox = getInfobox(body)
         # print("Infobox", infobox)
         # print("Ref type1", ref_type_1)
         # print("Ref type3", ref_type_3)
-        all_refs = ref_type_3
+        all_refs = ref_type_3 + ref_type_1
         # print("References", all_refs)
         # print("Categories", categories_str)
         category_tokens = []
@@ -183,12 +185,14 @@ class WikiParser(xml.sax.handler.ContentHandler):
         for stri in all_refs:
             refer_tokens.extend(tokenizer(stri))
 
-        tokens = tokenizer(self.currentPage.body, count=True)
+        tokens = tokenizer(body, count=True)
         # print("Tokens", tokens)
         body_flag = True
         link_flag = False
 
         # print(tokens)
+        link_tokens = []
+        body_tokens = []
         for token in tokens:
             if token == START_LINK:
                 link_flag = True
@@ -205,7 +209,8 @@ class WikiParser(xml.sax.handler.ContentHandler):
 
         # print(link_tokens)
         idx = self.currentPage.doc_no
-        title_tokens = tokenizer(self.currentPage.title, count=True)
+        title = ' '.join(self.currentPage.title)
+        title_tokens = tokenizer(title, count=True)
         info_tokens = tokenizer(infobox)
         addTokensToIndex(title_tokens, 0, idx)
         addTokensToIndex(info_tokens, 1, idx)
@@ -216,9 +221,9 @@ class WikiParser(xml.sax.handler.ContentHandler):
 
     def characters(self, content):
         if self.CurrentData == TAG_TEXT:
-            self.currentPage.body += content
+            self.currentPage.body.append(content)
         elif self.CurrentData == TAG_TITLE:
-            self.currentPage.title += content
+            self.currentPage.title.append(content)
 
 
 def main():
@@ -230,7 +235,7 @@ def main():
     parser = xml.sax.make_parser()
     parser.setContentHandler(handler)
     parser.parse(dump_location)
-    print("writing pickle file")
+    print("writing index file")
     if output_folder[-1] == '/':
         output_folder = output_folder[:-1]
     pickle_out = open(f"{output_folder}/index.pkl", "wb+")

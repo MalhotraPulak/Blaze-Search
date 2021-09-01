@@ -11,36 +11,18 @@ def stem(token):
     return snowball_stemmer.stem(token)
 
 
-# title: 0, infobox: 1, body: 2, categories: 3, references: 4, external_links: 5
-
-def field_query(query):
-    # t:World Cup i:2019 c:Cricket
-    units = query.split(" ")
+def process_query(query):
+    units = query.split()
     print(units)
     tokens = []
-    flag = -1
     for unit in units:
         if len(unit) > 2 and unit[1] == ':':
-            if unit[0] == 't':
-                flag = 0
-            if unit[0] == 'i':
-                flag = 1
-            if unit[0] == 'b':
-                flag = 2
-            if unit[0] == 'c':
-                flag = 3
-            if unit[0] == 'r':
-                flag = 4
-            if unit[0] == 'l':
-                flag = 5
-
             unit = unit[2:]
-
         tokens.append(unit)
     print(tokens)
     ans = {}
     for token in tokens:
-        # title: 0, infobox: 1, body: 2, categories: 3, references: 4, external_links: 5
+        # title: 0, info: 1, body: 2, cat: 3, ref: 4, links: 5
         og = deepcopy(token)
         token = stem(token.lower())
         ans[og] = {}
@@ -54,7 +36,7 @@ def field_query(query):
         ans[og]["categories"] = dic_token[3]
         ans[og]["references"] = dic_token[4]
         ans[og]["links"] = dic_token[5]
-    pprint.pprint(ans)
+    pprint.pprint(ans, indent=1)
 
 
 def main():
@@ -67,7 +49,7 @@ def main():
         with open(f"{index_loc}/index.pkl", "rb+") as file:
             dic = pickle.load(file)
         print("Done loading index in memory")
-        field_query(query_string)
+        process_query(query_string)
         print()
     except Exception as e:
         print("Error", e)
