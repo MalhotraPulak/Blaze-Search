@@ -1,10 +1,10 @@
 import pprint
-import pickle
 import sys
 from copy import deepcopy
 from nltk.stem import SnowballStemmer
 
 snowball_stemmer = SnowballStemmer('english')
+dic = {}
 
 
 def stem(token):
@@ -12,6 +12,7 @@ def stem(token):
 
 
 def process_query(query):
+    global dic
     units = query.split()
     print(units)
     tokens = []
@@ -49,8 +50,20 @@ def main():
     try:
         if index_loc[-1] == '/':
             index_loc = index_loc[: -1]
-        with open(f"{index_loc}/index.pkl", "rb+") as file:
-            dic = pickle.load(file)
+        with open(f"{index_loc}/index.txt", "r") as file:
+            lines = file.readlines()
+        for line in lines:
+            segments = line.split(';')
+            dic[segments[0]] = [[], [], [], [], [], []]
+            for segment in segments[1:]:
+                segment = segment.strip()
+                doc_id_freq = segment.split(":")
+                doc_id = int(doc_id_freq[0], base=16)
+                freq = int(doc_id_freq[1])
+                for idx in range(6):
+                    if (1 & (freq >> idx)) == 1:
+                        dic[segments[0]][idx].append(doc_id)
+        print(len(dic))
         print("Done loading index in memory")
         process_query(query_string)
         print()

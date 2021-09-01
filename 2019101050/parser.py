@@ -1,4 +1,5 @@
 import pickle
+import pprint
 import string
 import xml.sax
 from typing import Optional
@@ -108,21 +109,22 @@ def addTokensToIndex(tokens, pos, idx):
             indexed_dict[key][pos].append(idx)
 
 
-def getInfobox(text):
-    string = ""
-    regex = re.compile('{{ ?Infobox ', re.I)
-    segs = regex.split(text)[1:]
-
-    if len(segs):
-        split = re.split('}}', segs[-1])
-        for j in split:
-            if '{{' not in j:
-                segs[-1] = j
+def get_infobox(text):
+    ind = [m.start() for m in re.finditer(r'{{Infobox|{{infobox|{{ Infobox| {{ infobox', text)]
+    ans = ""
+    for i in ind:
+        counter = 0
+        end = -2
+        for j in range(i, len(text) - 1):
+            if text[j:j + 2] == '}}':
+                counter -= 1
+            elif text[j:j + 2] == '{{':
+                counter += 1
+            if counter == 0:
+                end = j + 1
                 break
-
-        string = '\n'.join(segs)
-
-    return string
+        ans += (text[i:end + 1])
+    return ans
 
 
 START_LINK = "startoflink"
@@ -149,7 +151,7 @@ class WikiParser(xml.sax.handler.ContentHandler):
         # global id_to_title, totalToken
 
         # id_to_title[self.currentPage.doc_no] = self.currentPage.title
-        # print(self.currentPage)
+        print(self.currentPage)
         if self.currentPage.doc_no % 1000 == 0:
             print(self.currentPage.doc_no, file=sys.stderr)
         body = ' '.join(self.currentPage.body)
@@ -167,7 +169,8 @@ class WikiParser(xml.sax.handler.ContentHandler):
         # ref_type_3 = re.findall(r'&lt;ref name=&quot;(.+?)&quot;', body)
         # print(self.currentPage)
         # print(ref_type_1)
-        infobox = getInfobox(body)
+        infobox = get_infobox(body)
+        print(infobox)
         # print("Infobox", infobox)
         # print("Ref type1", ref_type_1)
         # print("Ref type3", ref_type_3)
@@ -189,7 +192,7 @@ class WikiParser(xml.sax.handler.ContentHandler):
         body_flag = True
         link_flag = False
 
-        # print(tokens)
+        print(tokens)
         link_tokens = []
         body_tokens = []
         for token in tokens:
@@ -237,8 +240,25 @@ def main():
     print("writing index file")
     if output_folder[-1] == '/':
         output_folder = output_folder[:-1]
-    pickle_out = open(f"{output_folder}/index.pkl", "wb+")
-    pickle.dump(indexed_dict, pickle_out)
+    out = open(f"{output_folder}/index.txt", "w+")
+    lines = []
+    for k, v in sorted(indexed_dict.items()):
+        all_docs = {}
+        segments = []
+        for idx, ll in enumerate(v):
+            for doc in ll:
+                if doc not in all_docs:
+                    all_docs[doc] = 0
+                all_docs[doc] += (1 << idx)
+        for (doccc, freq) in all_docs.items():
+            segments.append(str(hex(doccc)[2:]) + ":" + str(freq))
+
+        line = k + ';' + ';'.join(segments)
+        lines.append(line)
+    print(indexed_dict["zambian"])
+    lines = '\n'.join(lines)
+    out.write(lines)
+    # pickle.dump(indexed_dict, pickle_out)
     # pickle_out = open(f"{output_folder}/id_to_title.pickle", "wb+")
     # pickle.dump(id_to_title, pickle_out)
     with open(stats_file, "w+") as text_file:
