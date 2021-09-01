@@ -1,4 +1,5 @@
 import pickle
+import string
 import xml.sax
 from typing import Optional
 import nltk
@@ -10,10 +11,11 @@ import sys
 nltk.download('stopwords')
 stopword = stopwords.words('english')
 snowball_stemmer = SnowballStemmer('english')
-
-
+regex = re.compile(r'(\d+|\s+|=|\|)')
 # import unicodedata
 # import json
+
+all_tokens = set()
 
 
 class Page:
@@ -76,15 +78,22 @@ def stem(token):
 
 
 def tokenizer(txt, count=False):
+    global regex
     txt = txt.lower()
-    punc_list = '\n\r\!"#$&*+,-./;?@\^_~)({}[]:'
+    punc_list = '\n\r\!"#$&*+,-./;?@\^_~)({}[]:|=<>'
+    # punctuation = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
+    # txt = txt.translate(str.maketrans('', '', string.punctuation))
+
     t = str.maketrans(dict.fromkeys(punc_list, " "))
     txt = txt.translate(t)
     t = str.maketrans(dict.fromkeys("`'", ""))
     txt = txt.translate(t)
-    regex = re.compile(r'(\d+|\s+|=|\|)')
-    tokens = [token for token in regex.split(txt)]
-    if count:
+    # print("Text", txt)
+    tokens = [token for token in txt.split()]
+    # print("Tokens", tokens)
+
+    if count and len(tokens):
+        all_tokens.update(tokens)
         global totalToken
         totalToken += len(tokens)
     tokens = [stem(token) for token in tokens if
@@ -121,7 +130,7 @@ def getInfobox(text):
     return string
 
 
-START_LINK = "startOfLink"
+START_LINK = "startoflink"
 
 
 # title: 0, info: 1, body: 2, cat: 3, refs: 4, links: 5
@@ -146,7 +155,7 @@ class WikiParser(xml.sax.handler.ContentHandler):
         link_tokens = []
         body_tokens = []
         # id_to_title[self.currentPage.doc_no] = self.currentPage.title
-        # print(self.currentPage)
+        print(self.currentPage)
         if self.currentPage.doc_no % 1000 == 0:
             print(self.currentPage.doc_no)
         self.currentPage.body = self.currentPage.body.replace("==External links==", START_LINK)
@@ -179,16 +188,22 @@ class WikiParser(xml.sax.handler.ContentHandler):
         body_flag = True
         link_flag = False
 
+        # print(tokens)
         for token in tokens:
             if token == START_LINK:
                 link_flag = True
                 body_flag = False
                 continue
-            if body_flag is True:
+            if body_flag:
                 body_tokens.append(token)
-            elif link_flag is True:
+            elif link_flag:
+                # category section after links
+                # TODO can be a false positive
+                if token == 'categori':
+                    break
                 link_tokens.append(token)
 
+        # print(link_tokens)
         idx = self.currentPage.doc_no
         title_tokens = tokenizer(self.currentPage.title, count=True)
         info_tokens = tokenizer(infobox)
@@ -223,7 +238,7 @@ def main():
     # pickle_out = open(f"{output_folder}/id_to_title.pickle", "wb+")
     # pickle.dump(id_to_title, pickle_out)
     with open(stats_file, "w+") as text_file:
-        text_file.write(f"{totalToken}\n{len(indexed_dict)}")
+        text_file.write(f"{len(all_tokens)}\n{len(indexed_dict)}")
     # with open("keys.txt", "w+") as text_file:
     #     json.dump(list(sorted(indexed_dict.keys())), text_file)
 
