@@ -5,10 +5,14 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.stem import SnowballStemmer
 import re
-import unicodedata
 import sys
 
+nltk.download('stopwords')
+stopword = stopwords.words('english')
+snowball_stemmer = SnowballStemmer('english')
 
+
+# import unicodedata
 # import json
 
 
@@ -42,7 +46,7 @@ TAG_TEXT = "text"
 TAG_TITLE = "title"
 
 
-def shortAndEnglish(s):
+def shortAndAscii(s):
     try:
         s.encode(encoding='utf-8').decode('ascii')
     except UnicodeDecodeError:
@@ -51,16 +55,8 @@ def shortAndEnglish(s):
         return True
 
 
-def strip_accents(s):
-    return ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
-
-
 totalToken = 0
 stemmed_dict = {}
-
-nltk.download('stopwords')
-stopword = stopwords.words('english')
-snowball_stemmer = SnowballStemmer('english')
 word_set = {}
 
 indexed_dict = {}
@@ -73,27 +69,24 @@ doc_id = 0
 def stem(token):
     if token in stemmed_dict:
         return stemmed_dict[token]
-    temp = snowball_stemmer.stem(token)
-    stemmed_dict[token] = temp
-    return temp
+    else:
+        temp = snowball_stemmer.stem(token)
+        stemmed_dict[token] = temp
+        return temp
 
 
-def clean(txt):
+def tokenizer(txt, count=False):
     txt = txt.lower()
-    punc_list = '\n\r\!"#$&*+,-./;?@\^_~)({}[]'
+    punc_list = '\n\r\!"#$&*+,-./;?@\^_~)({}[]:'
     t = str.maketrans(dict.fromkeys(punc_list, " "))
     txt = txt.translate(t)
-    t = str.maketrans(dict.fromkeys("`", ""))
+    t = str.maketrans(dict.fromkeys("`'", ""))
     txt = txt.translate(t)
-    return txt
-
-
-def regtok(txt):
-    txt = clean(txt)
     regex = re.compile(r'(\d+|\s+|=|\|)')
     tokens = [token for token in regex.split(txt)]
-    global totalToken
-    totalToken += len(tokens)
+    if count:
+        global totalToken
+        totalToken += len(tokens)
     tokens = [stem(token) for token in tokens if
               token not in word_set and token.isalnum()]
     return tokens
@@ -101,9 +94,9 @@ def regtok(txt):
 
 def addTokensToIndex(tokens, pos, idx):
     global indexed_dict
-    for unkey in tokens:
-        key = strip_accents(unkey)
-        if not shortAndEnglish(key) or not key.isalnum():
+    for key in tokens:
+        # key = strip_accents(unkey)
+        if not shortAndAscii(key) or not key.isalnum():
             continue
         if key not in indexed_dict:
             indexed_dict[key] = [[], [], [], [], [], []]
@@ -128,7 +121,10 @@ def getInfobox(text):
     return string
 
 
-# title: 0, infobox: 1, body: 2, categories: 3, references: 4, external_links: 5
+START_LINK = "startOfLink"
+
+
+# title: 0, info: 1, body: 2, cat: 3, refs: 4, links: 5
 
 class WikiParser(xml.sax.handler.ContentHandler):
     def __init__(self):
@@ -147,44 +143,44 @@ class WikiParser(xml.sax.handler.ContentHandler):
         if tag != TAG_PAGE:
             return
         # global id_to_title, totalToken
-        global totalToken
         link_tokens = []
         body_tokens = []
-        # TODO fix total tokens count
         # id_to_title[self.currentPage.doc_no] = self.currentPage.title
         # print(self.currentPage)
         if self.currentPage.doc_no % 1000 == 0:
             print(self.currentPage.doc_no)
-        self.currentPage.body = self.currentPage.body.replace("==External links==", "externallink")
+        self.currentPage.body = self.currentPage.body.replace("==External links==", START_LINK)
 
         categories_str = re.findall('(?<=\[\[Category:)(.*?)(?=\]\])', self.currentPage.body)
-        ref_type_1 = re.findall('(?<=\* \[\[)(.*?)(?=\])', self.currentPage.body)
+        # ref_type_1 = re.findall('(?<=\* \[\[)(.*?)(?=\])', self.currentPage.body)
         ref_type_3 = re.findall(r'<ref[^>]*>(.+?)</ref>', self.currentPage.body)
+        # print(self.currentPage)
+        # print(ref_type_1)
         infobox = getInfobox(self.currentPage.body)
         # print("Infobox", infobox)
         # print("Ref type1", ref_type_1)
         # print("Ref type3", ref_type_3)
-        all_refs = ref_type_1 + ref_type_3
+        all_refs = ref_type_3
         # print("References", all_refs)
         # print("Categories", categories_str)
         category_tokens = []
 
         # find all
         for stri in categories_str:
-            all_tok = regtok(stri)
+            all_tok = tokenizer(stri)
             category_tokens.extend(all_tok)
 
         refer_tokens = []
         for stri in all_refs:
-            refer_tokens.extend(regtok(stri))
+            refer_tokens.extend(tokenizer(stri))
 
-        tokens = regtok(self.currentPage.body)
+        tokens = tokenizer(self.currentPage.body, count=True)
         # print("Tokens", tokens)
         body_flag = True
         link_flag = False
 
         for token in tokens:
-            if token == 'externallink':
+            if token == START_LINK:
                 link_flag = True
                 body_flag = False
                 continue
@@ -194,8 +190,8 @@ class WikiParser(xml.sax.handler.ContentHandler):
                 link_tokens.append(token)
 
         idx = self.currentPage.doc_no
-        title_tokens = regtok(self.currentPage.title)
-        info_tokens = regtok(infobox)
+        title_tokens = tokenizer(self.currentPage.title, count=True)
+        info_tokens = tokenizer(infobox)
         addTokensToIndex(title_tokens, 0, idx)
         addTokensToIndex(info_tokens, 1, idx)
         addTokensToIndex(body_tokens, 2, idx)
