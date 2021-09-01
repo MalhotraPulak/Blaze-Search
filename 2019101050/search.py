@@ -36,6 +36,9 @@ def process_query(query):
         ans[og]["categories"] = dic_token[3]
         ans[og]["references"] = dic_token[4]
         ans[og]["links"] = dic_token[5]
+        for key, value in ans[og].items():
+            if not value:
+                ans[og][key] = ["No Doc Found"]
     pprint.pprint(ans, indent=1)
 
 

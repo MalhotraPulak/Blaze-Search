@@ -21,13 +21,13 @@ all_tokens = set()
 class Page:
     def __init__(self, doc_no):
         self.doc_no: int = doc_no
-        self.title = []
-        self.body = []
+        self.title: [str] = []
+        self.body: [str] = []
 
     def __str__(self):
         print("----Doc---")
         print("Doc no", self.doc_no)
-        print("Titl", self.title)
+        print("Titl", ' '.join(self.title))
         # print("Info", self.infobox)
         # print("Cat", self.category)
         # print("Links", self.links)
@@ -151,7 +151,7 @@ class WikiParser(xml.sax.handler.ContentHandler):
         # id_to_title[self.currentPage.doc_no] = self.currentPage.title
         # print(self.currentPage)
         if self.currentPage.doc_no % 1000 == 0:
-            print(self.currentPage.doc_no)
+            print(self.currentPage.doc_no, file=sys.stderr)
         body = ' '.join(self.currentPage.body)
 
         body = body.replace("==External links==", START_LINK)
@@ -176,14 +176,13 @@ class WikiParser(xml.sax.handler.ContentHandler):
         # print("Categories", categories_str)
         category_tokens = []
 
-        # find all
-        for stri in categories_str:
-            all_tok = tokenizer(stri)
+        for str_itr in categories_str:
+            all_tok = tokenizer(str_itr)
             category_tokens.extend(all_tok)
 
         refer_tokens = []
-        for stri in all_refs:
-            refer_tokens.extend(tokenizer(stri))
+        for str_itr in all_refs:
+            refer_tokens.extend(tokenizer(str_itr))
 
         tokens = tokenizer(body, count=True)
         # print("Tokens", tokens)
