@@ -151,12 +151,10 @@ class WikiParser(xml.sax.handler.ContentHandler):
         # global id_to_title, totalToken
 
         # id_to_title[self.currentPage.doc_no] = self.currentPage.title
-        print(self.currentPage)
+        # print(self.currentPage)
         if self.currentPage.doc_no % 1000 == 0:
             print(self.currentPage.doc_no, file=sys.stderr)
         body = ' '.join(self.currentPage.body)
-
-        body = body.replace("==External links==", START_LINK)
 
         categories_str = re.findall('(?<=\[\[Category:)(.*?)(?=\]\])', body)
         ref_type_1 = []
@@ -170,7 +168,13 @@ class WikiParser(xml.sax.handler.ContentHandler):
         # print(self.currentPage)
         # print(ref_type_1)
         infobox = get_infobox(body)
-        print(infobox)
+        # get links
+        lis = re.split(r"==External links==|== External links ==", body, 1)
+        link_tokens = []
+        if len(lis) > 1:
+            lis = re.split(r"==|\[\[", lis[1], 1)[0]
+            link_tokens = tokenizer(lis)
+        # print(infobox)
         # print("Infobox", infobox)
         # print("Ref type1", ref_type_1)
         # print("Ref type3", ref_type_3)
@@ -187,13 +191,14 @@ class WikiParser(xml.sax.handler.ContentHandler):
         for str_itr in all_refs:
             refer_tokens.extend(tokenizer(str_itr))
 
+        body = body.replace("==External links==", START_LINK)
         tokens = tokenizer(body, count=True)
         # print("Tokens", tokens)
         body_flag = True
         link_flag = False
 
-        print(tokens)
-        link_tokens = []
+        # print(tokens)
+        # link_tokens = []
         body_tokens = []
         for token in tokens:
             if token == START_LINK:
@@ -203,11 +208,9 @@ class WikiParser(xml.sax.handler.ContentHandler):
             if body_flag:
                 body_tokens.append(token)
             elif link_flag:
+                pass
                 # category section after links
-                # TODO can be a false positive
-                if token == 'categori':
-                    break
-                link_tokens.append(token)
+                # link_tokens.append(token)
 
         # print(link_tokens)
         idx = self.currentPage.doc_no
@@ -255,7 +258,7 @@ def main():
 
         line = k + ';' + ';'.join(segments)
         lines.append(line)
-    print(indexed_dict["zambian"])
+    # print(indexed_dict["zambian"])
     lines = '\n'.join(lines)
     out.write(lines)
     # pickle.dump(indexed_dict, pickle_out)

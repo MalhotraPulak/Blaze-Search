@@ -4,6 +4,7 @@ from copy import deepcopy
 from nltk.stem import SnowballStemmer
 
 snowball_stemmer = SnowballStemmer('english')
+lines = []
 dic = {}
 
 
@@ -14,18 +15,32 @@ def stem(token):
 def process_query(query):
     global dic
     units = query.split()
-    print(units)
+    # print(units)
     tokens = []
     for unit in units:
         if len(unit) > 2 and unit[1] == ':':
             unit = unit[2:]
         tokens.append(unit)
-    print(tokens)
+    # print(tokens)
     ans = {}
     for token in tokens:
         # title: 0, info: 1, body: 2, cat: 3, ref: 4, links: 5
         og = deepcopy(token)
         token = stem(token.lower())
+        for line in lines:
+            segments = line.split(';')
+            if segments[0] != token:
+                continue
+            dic[segments[0]] = [[], [], [], [], [], []]
+            for segment in segments[1:]:
+                segment = segment.strip()
+                doc_id_freq = segment.split(":")
+                doc_id = int(doc_id_freq[0], base=16)
+                freq = int(doc_id_freq[1])
+                for idx in range(6):
+                    if (1 & (freq >> idx)) == 1:
+                        dic[segments[0]][idx].append(doc_id)
+            break
         ans[og] = {}
         if token in dic:
             dic_token = dic[token]
@@ -44,6 +59,7 @@ def process_query(query):
 
 
 def main():
+    global lines
     index_loc, query_string = sys.argv[1], sys.argv[2]
     print(query_string)
     global dic
@@ -52,19 +68,6 @@ def main():
             index_loc = index_loc[: -1]
         with open(f"{index_loc}/index.txt", "r") as file:
             lines = file.readlines()
-        for line in lines:
-            segments = line.split(';')
-            dic[segments[0]] = [[], [], [], [], [], []]
-            for segment in segments[1:]:
-                segment = segment.strip()
-                doc_id_freq = segment.split(":")
-                doc_id = int(doc_id_freq[0], base=16)
-                freq = int(doc_id_freq[1])
-                for idx in range(6):
-                    if (1 & (freq >> idx)) == 1:
-                        dic[segments[0]][idx].append(doc_id)
-        print(len(dic))
-        print("Done loading index in memory")
         process_query(query_string)
         print()
     except Exception as e:
