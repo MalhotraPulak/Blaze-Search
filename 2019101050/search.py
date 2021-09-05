@@ -18,8 +18,9 @@ def process_query(query):
     # print(units)
     tokens = []
     for unit in units:
-        if len(unit) > 2 and unit[1] == ':':
-            unit = unit[2:]
+        if len(unit) >= 3:
+            if unit[1] == ':':
+                unit = unit[2:]
         tokens.append(unit)
     # print(tokens)
     ans = {}
@@ -61,7 +62,7 @@ def process_query(query):
 def main():
     global lines
     index_loc, query_string = sys.argv[1], sys.argv[2]
-    print(query_string)
+    # print(query_string)
     global dic
     try:
         if index_loc[-1] == '/':

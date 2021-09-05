@@ -1,8 +1,5 @@
-import pickle
-import pprint
-import string
 import xml.sax
-from typing import Optional
+from typing import List
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem import SnowballStemmer
@@ -13,17 +10,21 @@ nltk.download('stopwords')
 stopword = stopwords.words('english')
 snowball_stemmer = SnowballStemmer('english')
 regex = re.compile(r'(\d+|\s+|=|\|)')
-# import unicodedata
-# import json
 
 all_tokens = set()
+
+mystopwords = ["www", "https", "http", "com", "ref", "reflist", "jpg", "descript",
+            "redirect", "categori", "name", "refer", "title", "date", "imag",  
+        "author", "url", "use", "infobox", "site", "web", "also", "defaultsort", 
+        "use",  "list", "org", "publish", "cite", "websit", "caption"]
+
 
 
 class Page:
     def __init__(self, doc_no):
         self.doc_no: int = doc_no
-        self.title: [str] = []
-        self.body: [str] = []
+        self.title: List[str] = []
+        self.body: List[str] = []
 
     def __str__(self):
         print("----Doc---")
@@ -85,15 +86,29 @@ def tokenizer(txt, count=False):
     t = str.maketrans(dict.fromkeys("`'", ""))
     txt = txt.translate(t)
     # print("Text", txt)
-    tokens = [token for token in txt.split()]
+    tokens = txt.split()
     # print("Tokens", tokens)
 
     if count and len(tokens):
         all_tokens.update(tokens)
         global totalToken
         totalToken += len(tokens)
+
     tokens = [stem(token) for token in tokens if
               token not in word_set and token.isalnum()]
+    
+    # remove tokens with length greater than 15
+    tokens = [token for token in tokens if len(token) <= 15]
+
+    # remove numbers which are of greater than 4 length
+    tokens = [token for token in tokens if not (token[0] in "0123456789" and len(token) > 4)]
+    
+    # remove numbers with letters they are mostly useless
+    tokens = [token for token in tokens if not (any(c.isalpha() for c in token) and any(c.isdigit() for c in token))]
+
+    # remove some more stopped tokens
+    tokens = [token for token in tokens if token not in mystopwords] 
+
     return tokens
 
 
@@ -106,7 +121,9 @@ def addTokensToIndex(tokens, pos, idx):
         if key not in indexed_dict:
             indexed_dict[key] = [[], [], [], [], [], []]
         if not indexed_dict[key][pos] or indexed_dict[key][pos][-1] != idx:
-            indexed_dict[key][pos].append(idx)
+            indexed_dict[key][pos].append([idx, 1])
+        elif indexed_dict[key][pos][-1][0] == idx:
+            indexed_dict[key][pos][-1][1] += 1
 
 
 def get_infobox(text):
@@ -116,9 +133,10 @@ def get_infobox(text):
         counter = 0
         end = -2
         for j in range(i, len(text) - 1):
-            if text[j:j + 2] == '}}':
+            starting, ending = text[j:j + 2], text[j:j + 2]
+            if starting == '}}':
                 counter -= 1
-            elif text[j:j + 2] == '{{':
+            elif ending == '{{':
                 counter += 1
             if counter == 0:
                 end = j + 1
@@ -132,11 +150,11 @@ START_LINK = "startoflink"
 
 # title: 0, info: 1, body: 2, cat: 3, refs: 4, links: 5
 
-class WikiParser(xml.sax.handler.ContentHandler):
+class WikiParser(xml.sax.ContentHandler):
     def __init__(self):
         super().__init__()
         self.CurrentData = ""
-        self.currentPage: Optional[Page] = None
+        self.currentPage: Page = Page(-1) 
 
     def startElement(self, tag, attributes):
         self.CurrentData = tag
@@ -152,7 +170,7 @@ class WikiParser(xml.sax.handler.ContentHandler):
 
         # id_to_title[self.currentPage.doc_no] = self.currentPage.title
         # print(self.currentPage)
-        if self.currentPage.doc_no % 1000 == 0:
+        if self.currentPage and self.currentPage.doc_no % 1000 == 0:
             print(self.currentPage.doc_no, file=sys.stderr)
         body = ' '.join(self.currentPage.body)
 
@@ -231,10 +249,20 @@ class WikiParser(xml.sax.handler.ContentHandler):
             self.currentPage.title.append(content)
 
 
+field_map = {
+        0: 'z', 
+        1: 'y', 
+        2: 'x', 
+        3: 'v', 
+        4: 'u', 
+        5: 'v'
+};
+
+
 def main():
     dump_location, output_folder, stats_file = sys.argv[1], sys.argv[2], sys.argv[3]
     print(dump_location, output_folder, stats_file)
-    for word in stopword:
+    for word in stopword + mystopwords:
         word_set[word] = None
     handler = WikiParser()
     parser = xml.sax.make_parser()
@@ -245,19 +273,37 @@ def main():
         output_folder = output_folder[:-1]
     out = open(f"{output_folder}/index.txt", "w+")
     lines = []
+    # print("Indexed dict", indexed_dict)
     for k, v in sorted(indexed_dict.items()):
+
         all_docs = {}
         segments = []
-        for idx, ll in enumerate(v):
+        for field_id, ll in enumerate(v):
             for doc in ll:
-                if doc not in all_docs:
-                    all_docs[doc] = 0
-                all_docs[doc] += (1 << idx)
+                doc_id, term_freq = doc
+                if doc_id not in all_docs:
+                    all_docs[doc_id] = [0, 0, 0, 0, 0, 0]
+                all_docs[doc_id][field_id] = term_freq
+
         for (doccc, freq) in all_docs.items():
-            segments.append(str(hex(doccc)[2:]) + ":" + str(freq))
+            freq_str = ""
+            for field_id, freq_field in enumerate(freq):
+                if freq_field == 0:
+                    continue
+                else:
+                    # if one freq in body just use one byte to store it
+                    if field_id == 1 and freq_field == 1:
+                        freq_str += 'q'
+                    elif field_id == 2 and freq_field == 1:
+                        freq_str += 'p'
+                    else:
+                        freq_str += field_map[field_id] + str(freq_field)
+            # print(doccc, freq_str)
+            segments.append(str(hex(doccc)[2:]) + ":" + str(freq_str))
 
         line = k + ';' + ';'.join(segments)
         lines.append(line)
+    # print("here bro")
     # print(indexed_dict["zambian"])
     lines = '\n'.join(lines)
     out.write(lines)
