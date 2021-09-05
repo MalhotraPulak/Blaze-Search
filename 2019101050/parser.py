@@ -120,10 +120,15 @@ def addTokensToIndex(tokens, pos, idx):
             continue
         if key not in indexed_dict:
             indexed_dict[key] = [[], [], [], [], [], []]
-        if not indexed_dict[key][pos] or indexed_dict[key][pos][-1] != idx:
+        # print("Befor", key, idx, indexed_dict[key][pos])
+        if not indexed_dict[key][pos] or indexed_dict[key][pos][-1][0] != idx:
             indexed_dict[key][pos].append([idx, 1])
         elif indexed_dict[key][pos][-1][0] == idx:
             indexed_dict[key][pos][-1][1] += 1
+            # print(indexed_dict[key][pos][-1])
+        # print("After", key, idx, indexed_dict[key][pos])
+
+
 
 
 def get_infobox(text):
@@ -255,7 +260,7 @@ field_map = {
         2: 'x', 
         3: 'v', 
         4: 'u', 
-        5: 'v'
+        5: 't'
 };
 
 
@@ -303,7 +308,6 @@ def main():
 
         line = k + ';' + ';'.join(segments)
         lines.append(line)
-    # print("here bro")
     # print(indexed_dict["zambian"])
     lines = '\n'.join(lines)
     out.write(lines)

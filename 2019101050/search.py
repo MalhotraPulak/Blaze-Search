@@ -11,6 +11,15 @@ dic = {}
 def stem(token):
     return snowball_stemmer.stem(token)
 
+field_map = {
+        'z': 0, 
+        'y':1, 
+        'x':2, 
+        'v':3, 
+        'u':4, 
+        't':5
+};
+
 
 def process_query(query):
     global dic
@@ -32,15 +41,27 @@ def process_query(query):
             segments = line.split(';')
             if segments[0] != token:
                 continue
-            dic[segments[0]] = [[], [], [], [], [], []]
+            dic[token] = [[], [], [], [], [], []]
             for segment in segments[1:]:
                 segment = segment.strip()
                 doc_id_freq = segment.split(":")
                 doc_id = int(doc_id_freq[0], base=16)
-                freq = int(doc_id_freq[1])
-                for idx in range(6):
-                    if (1 & (freq >> idx)) == 1:
-                        dic[segments[0]][idx].append(doc_id)
+                freq_str = str(doc_id_freq[1]) + 'z'
+                last = ''
+                freq = 0
+                print(doc_id, freq_str)
+                for c in freq_str:
+                    if c in list(field_map.keys()) + ['p', 'q']:
+                        if c == 'p':
+                            dic[token][2].append([doc_id, 1])
+                        elif c == 'q':
+                            dic[token][1].append([doc_id, 1])
+                        if freq != 0 and last:
+                            dic[token][field_map[last]].append([doc_id, freq])
+                            freq = 0
+                        last = c
+                    else:
+                        freq = freq * 10 + int(c) 
             break
         ans[og] = {}
         if token in dic:
