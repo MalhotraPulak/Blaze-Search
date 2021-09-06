@@ -11,14 +11,15 @@ stopword = stopwords.words('english')
 snowball_stemmer = SnowballStemmer('english')
 regex = re.compile(r'(\d+|\s+|=|\|)')
 
-all_tokens = set()
+# all_tokens = set()
 
 mystopwords = ["www", "https", "http", "com", "ref", "reflist", "jpg", "descript",
             "redirect", "categori", "name", "refer", "title", "date", "imag",  
         "author", "url", "use", "infobox", "site", "web", "also", "defaultsort", 
         "use",  "list", "org", "publish", "cite", "websit", "caption"]
 
-
+doc_mem = 0
+chunk_no = 0
 
 class Page:
     def __init__(self, doc_no):
@@ -57,10 +58,13 @@ def shortAndAscii(s):
 totalToken = 0
 stemmed_dict = {}
 word_set = {}
+output_folder = ""
 
 indexed_dict = {}
 doc_id = 0
 
+DOC_IN_MEM = 100000
+OUTPUT_DELTA = 5000
 
 # id_to_title = {}
 
@@ -73,8 +77,22 @@ def stem(token):
         stemmed_dict[token] = temp
         return temp
 
-
-def tokenizer(txt, count=False):
+def validToken(token):
+    # filter tokens to make index smaller
+    # remove long tokens they are probably wrong
+    # remove numbers which are of greater than 4 length
+    # remove some more stopped tokens
+    if len(token) > 15:
+        return False
+    if token in mystopwords:
+        return False
+    if token[0] in "0123456789" and len(token) > 4:
+        return False
+    if any(c.isalpha() for c in token) and any(c.isdigit() for c in token):
+        return False
+    return True
+    
+def tokenizer(txt):
     global regex
     txt = txt.lower()
     punc_list = '\n\r\!"#$&*+,-./;?@\^_~)({}[]:|=<>'
@@ -89,25 +107,10 @@ def tokenizer(txt, count=False):
     tokens = txt.split()
     # print("Tokens", tokens)
 
-    if count and len(tokens):
-        all_tokens.update(tokens)
-        global totalToken
-        totalToken += len(tokens)
-
     tokens = [stem(token) for token in tokens if
               token not in word_set and token.isalnum()]
     
-    # remove tokens with length greater than 15
-    tokens = [token for token in tokens if len(token) <= 15]
-
-    # remove numbers which are of greater than 4 length
-    tokens = [token for token in tokens if not (token[0] in "0123456789" and len(token) > 4)]
-    
-    # remove numbers with letters they are mostly useless
-    tokens = [token for token in tokens if not (any(c.isalpha() for c in token) and any(c.isdigit() for c in token))]
-
-    # remove some more stopped tokens
-    tokens = [token for token in tokens if token not in mystopwords] 
+    tokens = [token for token in tokens if validToken(token)]
 
     return tokens
 
@@ -149,9 +152,50 @@ def get_infobox(text):
         ans += (text[i:end + 1])
     return ans
 
+def dump_index():
+    global output_folder, chunk_no, indexed_dict, doc_mem
+    print("writing index file")
+    # write the current index to memory
+    out = open(f"{output_folder}/index{chunk_no}.txt", "w+")
+    lines = []
+    for k, v in sorted(indexed_dict.items()):
+
+        all_docs = {}
+        segments = []
+        for field_id, ll in enumerate(v):
+            for doc in ll:
+                doc_id, term_freq = doc
+                if doc_id not in all_docs:
+                    all_docs[doc_id] = [0, 0, 0, 0, 0, 0]
+                all_docs[doc_id][field_id] = term_freq
+
+        for (doccc, freq) in all_docs.items():
+            freq_str = ""
+            for field_id, freq_field in enumerate(freq):
+                if freq_field == 0:
+                    continue
+                else:
+                    # if one freq in body just use one byte to store it
+                    if field_id == 1 and freq_field == 1:
+                        freq_str += 'q'
+                    elif field_id == 2 and freq_field == 1:
+                        freq_str += 'p'
+                    else:
+                        freq_str += field_map[field_id] + str(freq_field)
+            segments.append(str(hex(doccc)[2:]) + ":" + str(freq_str))
+
+        line = k + ';' + ';'.join(segments)
+        lines.append(line)
+    lines = '\n'.join(lines)
+    out.write(lines)
+
+    # cleanup 
+    doc_mem = 0
+    chunk_no += 1
+    indexed_dict = {}
+
 
 START_LINK = "startoflink"
-
 
 # title: 0, info: 1, body: 2, cat: 3, refs: 4, links: 5
 
@@ -163,10 +207,13 @@ class WikiParser(xml.sax.ContentHandler):
 
     def startElement(self, tag, attributes):
         self.CurrentData = tag
-        global doc_id
+        global doc_id, doc_mem
         if tag == TAG_PAGE:
             self.currentPage = Page(doc_id)
             doc_id += 1
+            doc_mem += 1
+            if doc_mem >= DOC_IN_MEM:
+                dump_index()            
 
     def endElement(self, tag):
         if tag != TAG_PAGE:
@@ -175,7 +222,7 @@ class WikiParser(xml.sax.ContentHandler):
 
         # id_to_title[self.currentPage.doc_no] = self.currentPage.title
         # print(self.currentPage)
-        if self.currentPage and self.currentPage.doc_no % 1000 == 0:
+        if self.currentPage and self.currentPage.doc_no % OUTPUT_DELTA == 0:
             print(self.currentPage.doc_no, file=sys.stderr)
         body = ' '.join(self.currentPage.body)
 
@@ -215,30 +262,21 @@ class WikiParser(xml.sax.ContentHandler):
             refer_tokens.extend(tokenizer(str_itr))
 
         body = body.replace("==External links==", START_LINK)
-        tokens = tokenizer(body, count=True)
+        tokens = tokenizer(body)
         # print("Tokens", tokens)
-        body_flag = True
-        link_flag = False
 
         # print(tokens)
         # link_tokens = []
         body_tokens = []
         for token in tokens:
             if token == START_LINK:
-                link_flag = True
-                body_flag = False
-                continue
-            if body_flag:
-                body_tokens.append(token)
-            elif link_flag:
-                pass
-                # category section after links
-                # link_tokens.append(token)
+                break
+            body_tokens.append(token)
 
         # print(link_tokens)
         idx = self.currentPage.doc_no
         title = ' '.join(self.currentPage.title)
-        title_tokens = tokenizer(title, count=True)
+        title_tokens = tokenizer(title)
         info_tokens = tokenizer(infobox)
         addTokensToIndex(title_tokens, 0, idx)
         addTokensToIndex(info_tokens, 1, idx)
@@ -265,7 +303,10 @@ field_map = {
 
 
 def main():
+    global output_folder
     dump_location, output_folder, stats_file = sys.argv[1], sys.argv[2], sys.argv[3]
+    if output_folder[-1] == '/':
+        output_folder = output_folder[:-1]
     print(dump_location, output_folder, stats_file)
     for word in stopword + mystopwords:
         word_set[word] = None
@@ -273,49 +314,13 @@ def main():
     parser = xml.sax.make_parser()
     parser.setContentHandler(handler)
     parser.parse(dump_location)
-    print("writing index file")
-    if output_folder[-1] == '/':
-        output_folder = output_folder[:-1]
-    out = open(f"{output_folder}/index.txt", "w+")
-    lines = []
-    # print("Indexed dict", indexed_dict)
-    for k, v in sorted(indexed_dict.items()):
-
-        all_docs = {}
-        segments = []
-        for field_id, ll in enumerate(v):
-            for doc in ll:
-                doc_id, term_freq = doc
-                if doc_id not in all_docs:
-                    all_docs[doc_id] = [0, 0, 0, 0, 0, 0]
-                all_docs[doc_id][field_id] = term_freq
-
-        for (doccc, freq) in all_docs.items():
-            freq_str = ""
-            for field_id, freq_field in enumerate(freq):
-                if freq_field == 0:
-                    continue
-                else:
-                    # if one freq in body just use one byte to store it
-                    if field_id == 1 and freq_field == 1:
-                        freq_str += 'q'
-                    elif field_id == 2 and freq_field == 1:
-                        freq_str += 'p'
-                    else:
-                        freq_str += field_map[field_id] + str(freq_field)
-            # print(doccc, freq_str)
-            segments.append(str(hex(doccc)[2:]) + ":" + str(freq_str))
-
-        line = k + ';' + ';'.join(segments)
-        lines.append(line)
-    # print(indexed_dict["zambian"])
-    lines = '\n'.join(lines)
-    out.write(lines)
+    dump_index()
     # pickle.dump(indexed_dict, pickle_out)
     # pickle_out = open(f"{output_folder}/id_to_title.pickle", "wb+")
     # pickle.dump(id_to_title, pickle_out)
     with open(stats_file, "w+") as text_file:
-        text_file.write(f"{len(all_tokens)}\n{len(indexed_dict)}")
+        # text_file.write(f"{len(all_tokens)}\n{len(indexed_dict)}")
+        text_file.write(f"{chunk_no}\n{len(indexed_dict)}")
     # with open("keys.txt", "w+") as text_file:
     #     json.dump(list(sorted(indexed_dict.keys())), text_file)
 
