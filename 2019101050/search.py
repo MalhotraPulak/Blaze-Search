@@ -1,12 +1,18 @@
 import sys
 from nltk.stem import SnowballStemmer
+from nltk.corpus import stopwords
+import nltk
+nltk.download('stopwords')
+stopword = stopwords.words('english')
 
 snowball_stemmer = SnowballStemmer('english')
-WEIGHTS = [5, 3, 1, 2, 1, 1]
 
+word_set = {}
 
 def stem(token):
     return snowball_stemmer.stem(token)
+
+# title: 0, info: 1, body: 2, cat: 3, ref: 4, links: 5
 
 field_map = {
         'z': 0, 
@@ -16,6 +22,7 @@ field_map = {
         'u':4, 
         't':5
 };
+WEIGHTS = [5, 3, 1, 2, 1, 1]
 
 dic = {}
 TOTAL_DOCS = 22000000
@@ -23,7 +30,7 @@ import math
 
 def process_word(word, field):
     print("searching", word, file=sys.stderr)
-    index_file_loc = f"/scratch/pulak/mergedIndex3/{word[0:3]}.txt"
+    index_file_loc = f"./scratch/pulak/mergedIndex3/{word[0:3]}.txt"
     try:
         file = open(index_file_loc, "r")
     except:
@@ -44,7 +51,7 @@ def process_word(word, field):
     print("Found", word, file=sys.stderr)
     doc_list = tokens
     idf = math.log10(TOTAL_DOCS/ len(doc_list))
-    
+    print("Idf is", idf)
     field_names = list(field_map.keys()) + ['p', 'q'] 
     print(len(tokens))
     for segment in doc_list:
@@ -53,31 +60,52 @@ def process_word(word, field):
         freq_str = str(doc_id_freq[1]) + 'z'
         last = ''
         freq = 0
-        if doc_id not in dic:
-            dic[doc_id] = 0
+        score = 0
         for c in freq_str:
             if c in field_names:
                 if c == 'p':
-                    dic[doc_id] += WEIGHTS[2] * (1 + math.log10(1)) * idf
+                    score += WEIGHTS[2] * idf
                 elif c == 'q':
-                    dic[doc_id] += WEIGHTS[1] * (1 + math.log10(1)) * idf
+                    score += WEIGHTS[1] * idf
                 if freq != 0 and last:
-                    dic[doc_id] += WEIGHTS[field_map[last]] * (1 + math.log10(freq)) * idf
+                    score += WEIGHTS[field_map[last]] * (1 + math.log10(freq)) * idf
                     freq = 0
                 last = c
             else:
                 freq = freq * 10 + int(c) 
-    print("Done adding to global dic")
+        if score < 10:
+            continue
+        if doc_id not in dic:
+            dic[doc_id] = score
+        else:
+            dic[doc_id] += score
+        
+    print("Done adding to global dic", len(dic))
   
 
 
 
 def process_query(query):
-    units = query.split()
-    # TODO translate text to remove punctuation
-    # print(units)
+    # units = query.split()
+    txt = query.lower()
+    punc_list = '\n\r\!"#$&*+,-./;?@\^_~)({}[]|=<>'
+    # punctuation = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
+    # txt = txt.translate(str.maketrans('', '', string.punctuation))
+    t = str.maketrans(dict.fromkeys(punc_list, " "))
+    txt = txt.translate(t)
+    t = str.maketrans(dict.fromkeys("`'", ""))
+    txt = txt.translate(t)
+    # print("Text", txt)
+    tokens = txt.split()
+    # print("Tokens", tokens)
+
+    tokens = [stem(token) for token in tokens if
+              token not in word_set and token.isalnum()]
+  
+
+    print("Tokens are:", tokens)
     field = -1
-    for unit in units:
+    for unit in tokens:
         if len(unit) >= 3 and unit[1] == ":":
             tok = unit[0]
             if tok == 't':
@@ -98,60 +126,23 @@ def process_query(query):
     global dic
     ans = {k: v for k, v in sorted(dic.items(), key=lambda item: -item[1])}
     keys = list(ans.keys())
+    print(list(ans.values())[:100])
     print(keys[:10])
-    # print(tokens)
-    # ans = {}
-    # for token in tokens:
-    #     # title: 0, info: 1, body: 2, cat: 3, ref: 4, links: 5
-    #     og = deepcopy(token)
-    #     token = stem(token.lower())
-    #     for line in lines:
-    #         segments = line.split(';')
-    #         if segments[0] != token:
-    #             continue
-    #         dic[token] = [[], [], [], [], [], []]
-    #         for segment in segments[1:]:
-    #             segment = segment.strip()
-    #             doc_id_freq = segment.split(":")
-    #             doc_id = int(doc_id_freq[0], base=16)
-    #             freq_str = str(doc_id_freq[1]) + 'z'
-    #             last = ''
-    #             freq = 0
-    #             print(doc_id, freq_str)
-    #             for c in freq_str:
-    #                 if c in list(field_map.keys()) + ['p', 'q']:
-    #                     if c == 'p':
-    #                         dic[token][2].append([doc_id, 1])
-    #                     elif c == 'q':
-    #                         dic[token][1].append([doc_id, 1])
-    #                     if freq != 0 and last:
-    #                         dic[token][field_map[last]].append([doc_id, freq])
-    #                         freq = 0
-    #                     last = c
-    #                 else:
-    #                     freq = freq * 10 + int(c) 
-    #         break
-    #     ans[og] = {}
-    #     if token in dic:
-    #         dic_token = dic[token]
-    #     else:
-    #         dic_token = [[], [], [], [], [], []]
-    #     ans[og]["title"] = dic_token[0]
-    #     ans[og]["body"] = dic_token[2]
-    #     ans[og]["infobox"] = dic_token[1]
-    #     ans[og]["categories"] = dic_token[3]
-    #     ans[og]["references"] = dic_token[4]
-    #     ans[og]["links"] = dic_token[5]
-    #     for key, value in ans[og].items():
-    #         if not value:
-    #             ans[og][key] = ["No Doc Found"]
-    # pprint.pprint(ans, indent=1)
-
+    for doc_id in keys[:10]:
+        title_no = int(doc_id) // 50000; 
+        with open(f"titles/title{title_no}.txt", "r") as f:
+            lines = f.readlines()
+            line_no = (doc_id % 50000) * 2
+            print(lines[line_no])
+    
 
 def main():
     global lines
     query_string = sys.argv[1]
     # print(query_string)
+    for word in stopword:
+        word_set[word] = None
+
     global dic
     try:
         process_query(query_string)
