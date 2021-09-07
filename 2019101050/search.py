@@ -1,6 +1,4 @@
-import pprint
 import sys
-from copy import deepcopy
 from nltk.stem import SnowballStemmer
 
 snowball_stemmer = SnowballStemmer('english')
@@ -24,23 +22,32 @@ TOTAL_DOCS = 22000000
 import math
 
 def process_word(word, field):
-    print("searching", word)
-    index_file_loc = f"./mergedIndex/{word[0]}.txt"
-    file = open(index_file_loc, "r")
+    print("searching", word, file=sys.stderr)
+    index_file_loc = f"/scratch/pulak/mergedIndex3/{word[0:3]}.txt"
+    try:
+        file = open(index_file_loc, "r")
+    except:
+        return
     lines = file.readlines()
+    print("done loading file in memory", file=sys.stderr)
     tokens = []
     for line in lines:
-        tokens = line.split(';')
+        tokens = line.split(';', maxsplit=1)
         if tokens[0] != word:
             continue 
         else:
             break
-
-    docs = tokens[1:]
-    idf = math.log10(TOTAL_DOCS/ len(docs))
-
-    for segment in tokens[1:]:
-        segment = segment.strip()
+    
+    if tokens[0] != word:
+        return
+    tokens = tokens[1].strip().split(';') 
+    print("Found", word, file=sys.stderr)
+    doc_list = tokens
+    idf = math.log10(TOTAL_DOCS/ len(doc_list))
+    
+    field_names = list(field_map.keys()) + ['p', 'q'] 
+    print(len(tokens))
+    for segment in doc_list:
         doc_id_freq = segment.split(":")
         doc_id = int(doc_id_freq[0], base=16)
         freq_str = str(doc_id_freq[1]) + 'z'
@@ -49,7 +56,7 @@ def process_word(word, field):
         if doc_id not in dic:
             dic[doc_id] = 0
         for c in freq_str:
-            if c in list(field_map.keys()) + ['p', 'q']:
+            if c in field_names:
                 if c == 'p':
                     dic[doc_id] += WEIGHTS[2] * (1 + math.log10(1)) * idf
                 elif c == 'q':
@@ -60,6 +67,7 @@ def process_word(word, field):
                 last = c
             else:
                 freq = freq * 10 + int(c) 
+    print("Done adding to global dic")
   
 
 
@@ -68,8 +76,8 @@ def process_query(query):
     units = query.split()
     # TODO translate text to remove punctuation
     # print(units)
+    field = -1
     for unit in units:
-        field = -1
         if len(unit) >= 3 and unit[1] == ":":
             tok = unit[0]
             if tok == 't':

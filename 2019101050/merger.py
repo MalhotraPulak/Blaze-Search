@@ -28,7 +28,7 @@ class FileIter:
         return self.tokens[1:]
 
 
-
+import sys
 def main():
     file_iters = []
     last_open = None
@@ -44,12 +44,13 @@ def main():
     while file_iters:
         smallestIter = heappop(file_iters)
         token = smallestIter.token
-        if token[0] != last_open:
+        if token[0:3] != last_open:
             if out_file:
                 out_file.close()
-            last_open = token[0]
-            out_file = open(f"/scratch/pulak/mergedIndex/{last_open}.txt", "w+")
-            print("Writing to", last_open)
+            last_open = token[0:3]
+            out_file = open(f"/scratch/pulak/mergedIndex3/{last_open}.txt", "w+")
+            # out_file = open(f"mergedIndex2/{last_open}.txt", "w+")
+            print("Writing to", last_open, file=sys.stderr)
         docs_list = []
         docs_list.extend(smallestIter.get_docs())
         if smallestIter.get_next() != -1:
