@@ -19,11 +19,15 @@ field_map = {
         't':5
 };
 
+dic = {}
+TOTAL_DOCS = 22000000
+import math
+
 def process_word(word, field):
-    index_file_loc = f"mergedIndex/{word[0]}.txt"
+    print("searching", word)
+    index_file_loc = f"./mergedIndex/{word[0]}.txt"
     file = open(index_file_loc, "r")
     lines = file.readlines()
-    dic = {}
     tokens = []
     for line in lines:
         tokens = line.split(';')
@@ -31,7 +35,10 @@ def process_word(word, field):
             continue 
         else:
             break
-    token = word
+
+    docs = tokens[1:]
+    idf = math.log10(TOTAL_DOCS/ len(docs))
+
     for segment in tokens[1:]:
         segment = segment.strip()
         doc_id_freq = segment.split(":")
@@ -39,14 +46,16 @@ def process_word(word, field):
         freq_str = str(doc_id_freq[1]) + 'z'
         last = ''
         freq = 0
+        if doc_id not in dic:
+            dic[doc_id] = 0
         for c in freq_str:
             if c in list(field_map.keys()) + ['p', 'q']:
                 if c == 'p':
-                    dic[token][2].append([doc_id, 1])
+                    dic[doc_id] += WEIGHTS[2] * (1 + math.log10(1)) * idf
                 elif c == 'q':
-                    dic[token][1].append([doc_id, 1])
+                    dic[doc_id] += WEIGHTS[1] * (1 + math.log10(1)) * idf
                 if freq != 0 and last:
-                    dic[token][field_map[last]].append([doc_id, freq])
+                    dic[doc_id] += WEIGHTS[field_map[last]] * (1 + math.log10(freq)) * idf
                     freq = 0
                 last = c
             else:
@@ -77,6 +86,11 @@ def process_query(query):
                 field = 5
             unit = unit[2:]
         process_word(stem(unit.lower()), field) 
+
+    global dic
+    ans = {k: v for k, v in sorted(dic.items(), key=lambda item: -item[1])}
+    keys = list(ans.keys())
+    print(keys[:10])
     # print(tokens)
     # ans = {}
     # for token in tokens:
@@ -128,14 +142,11 @@ def process_query(query):
 
 def main():
     global lines
-    index_loc, query_string = sys.argv[1], sys.argv[2]
+    query_string = sys.argv[1]
     # print(query_string)
     global dic
     try:
-        if index_loc[-1] == '/':
-            index_loc = index_loc[: -1]
         process_query(query_string)
-        print()
     except Exception as e:
         print("Error", e)
 
