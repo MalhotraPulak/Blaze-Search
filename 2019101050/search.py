@@ -2,35 +2,36 @@ import sys
 from nltk.stem import SnowballStemmer
 from nltk.corpus import stopwords
 import nltk
-# nltk.download('stopwords')
-stopword = stopwords.words('english')
 
-snowball_stemmer = SnowballStemmer('english')
+# nltk.download('stopwords')
+stopword = stopwords.words("english")
+
+snowball_stemmer = SnowballStemmer("english")
 
 word_set = {}
+
 
 def stem(token):
     return snowball_stemmer.stem(token)
 
+
 # title: 0, info: 1, body: 2, cat: 3, ref: 4, links: 5
 
 field_map = {
-        'z': 0, 
-        'y':1, 
-        'x':2, 
-        'v':3, 
-        'u':4, 
-        't':5,
-        'p':2,
-        'q':1,
-};
+    "z": 0,
+    "y": 1,
+    "x": 2,
+    "v": 3,
+    "u": 4,
+    "t": 5,
+    "p": 2,
+    "q": 1,
+}
 WEIGHTS = [5, 3, 1, 2, 1, 1]
 
 # dic = {}
 TOTAL_DOCS = 22000000
 import math
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import as_completed 
 from collections import Counter
 import multiprocessing as mp
 
@@ -47,26 +48,26 @@ def process_word(word, field):
     # print("done loading file in memory", file=sys.stderr)
     tokens = []
     for line in lines:
-        tokens = line.split(';', maxsplit=1)
+        tokens = line.split(";", maxsplit=1)
         if tokens[0] != word:
-            continue 
+            continue
         else:
             break
-    
+
     if tokens[0] != word:
         return
-    tokens = tokens[1].strip().split(';') 
+    tokens = tokens[1].strip().split(";")
     # print("Found", word, file=sys.stderr)
     doc_list = tokens
-    idf = math.log10(TOTAL_DOCS/ len(doc_list))
+    idf = math.log10(TOTAL_DOCS / len(doc_list))
     print("Idf for", word, "is", idf)
-    field_names = list(field_map.keys()) 
+    field_names = list(field_map.keys())
     # print(len(tokens))
     for segment in doc_list:
         doc_id_freq = segment.split(":")
         doc_id = int(doc_id_freq[0], base=16)
-        freq_str = str(doc_id_freq[1]) + 'z'
-        last = ''
+        freq_str = str(doc_id_freq[1]) + "z"
+        last = ""
         freq = 0
         score = 0
         for c in freq_str:
@@ -74,27 +75,30 @@ def process_word(word, field):
                 bonus = 1
                 if field_map[c] == field:
                     bonus = 4
-                if c == 'p':
+                if c == "p":
                     score += WEIGHTS[2] * idf * bonus
-                elif c == 'q':
+                elif c == "q":
                     score += WEIGHTS[1] * idf * bonus
                 if freq != 0 and last:
-                    score += WEIGHTS[field_map[last]] * (1 + math.log10(freq)) * idf * bonus
+                    score += (
+                        WEIGHTS[field_map[last]]
+                        * (1 + math.log10(freq))
+                        * idf
+                        * bonus
+                    )
                     freq = 0
                 last = c
             else:
-                freq = freq * 10 + int(c) 
+                freq = freq * 10 + int(c)
         if score < 5:
             continue
         if doc_id not in local_dic:
             local_dic[doc_id] = score
         else:
             local_dic[doc_id] += score
-        
+
     print("Done adding to local dic", len(local_dic))
     return local_dic
-  
-
 
 
 def process_query(query):
@@ -115,24 +119,24 @@ def process_query(query):
 
     # tokens = [stem(token) for token in tokens if
     #           token not in word_set and token.isalnum()]
-  
+
     results = []
     print("Tokens are:", tokens)
     field = -1
     for unit in tokens:
         if len(unit) >= 3 and unit[1] == ":":
             tok = unit[0]
-            if tok == 't':
+            if tok == "t":
                 field = 0
-            elif tok == 'i':
+            elif tok == "i":
                 field = 1
-            elif tok == 'b':
+            elif tok == "b":
                 field = 2
-            elif tok == 'c':
+            elif tok == "c":
                 field = 3
-            elif tok == 'r':
+            elif tok == "r":
                 field = 4
-            elif tok == 'l':
+            elif tok == "l":
                 field = 5
             unit = unit[2:]
         if unit in word_set:
@@ -140,7 +144,7 @@ def process_query(query):
         unit = stem(unit)
         # futures.append(executor.submit(process_word, unit, field));
         results.append(pool.apply_async(process_word, args=(unit, field)))
-        # process_word(stem(unit.lower()), field) 
+        # process_word(stem(unit.lower()), field)
     dic = Counter()
     for result in results:
         dic += Counter(result.get())
@@ -153,12 +157,12 @@ def process_query(query):
     print(keys[:10])
     print()
     for doc_id in keys[:10]:
-        title_no = int(doc_id) // 50000; 
+        title_no = int(doc_id) // 50000
         with open(f"titles/title{title_no}.txt", "r") as f:
             lines = f.readlines()
             line_no = (doc_id % 50000) * 2
             print(lines[line_no][:-1], "{:.2f}".format(dic[doc_id]))
-    
+
 
 def main():
     global lines
