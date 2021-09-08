@@ -73,7 +73,7 @@ def process_word(word, field):
                 last = c
             else:
                 freq = freq * 10 + int(c) 
-        if score < 10:
+        if score < 5:
             continue
         if doc_id not in dic:
             dic[doc_id] = score
@@ -126,14 +126,15 @@ def process_query(query):
     global dic
     ans = {k: v for k, v in sorted(dic.items(), key=lambda item: -item[1])}
     keys = list(ans.keys())
-    print(list(ans.values())[:100])
+    # print(list(ans.values())[:100])
     print(keys[:10])
+    print()
     for doc_id in keys[:10]:
         title_no = int(doc_id) // 50000; 
         with open(f"titles/title{title_no}.txt", "r") as f:
             lines = f.readlines()
             line_no = (doc_id % 50000) * 2
-            print(lines[line_no])
+            print(lines[line_no][:-1], "{:.2f}".format(dic[doc_id]))
     
 
 def main():
