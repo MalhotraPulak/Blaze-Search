@@ -24,11 +24,15 @@ field_map = {
 };
 WEIGHTS = [5, 3, 1, 2, 1, 1]
 
-dic = {}
+# dic = {}
 TOTAL_DOCS = 22000000
 import math
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed 
+from collections import Counter
 
 def process_word(word, field):
+    local_dic = {}
     print("searching", word, file=sys.stderr)
     index_file_loc = f"./scratch/pulak/mergedIndex3/{word[0:3]}.txt"
     try:
@@ -75,18 +79,20 @@ def process_word(word, field):
                 freq = freq * 10 + int(c) 
         if score < 5:
             continue
-        if doc_id not in dic:
-            dic[doc_id] = score
+        if doc_id not in local_dic:
+            local_dic[doc_id] = score
         else:
-            dic[doc_id] += score
+            local_dic[doc_id] += score
         
-    print("Done adding to global dic", len(dic))
+    print("Done adding to global dic", len(local_dic))
+    return local_dic
   
 
 
 
 def process_query(query):
     # units = query.split()
+    executor = ThreadPoolExecutor()
     txt = query.lower()
     punc_list = '\n\r\!"#$&*+,-./;?@\^_~)({}[]|=<>'
     # punctuation = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
@@ -102,7 +108,7 @@ def process_query(query):
     tokens = [stem(token) for token in tokens if
               token not in word_set and token.isalnum()]
   
-
+    futures = []
     print("Tokens are:", tokens)
     field = -1
     for unit in tokens:
@@ -121,9 +127,12 @@ def process_query(query):
             elif tok == 'l':
                 field = 5
             unit = unit[2:]
-        process_word(stem(unit.lower()), field) 
+        futures.append(executor.submit(process_word, unit, field));
+        # process_word(stem(unit.lower()), field) 
+    dic = Counter()
+    for fut in as_completed(futures):
+        dic += Counter(fut.result())
 
-    global dic
     ans = {k: v for k, v in sorted(dic.items(), key=lambda item: -item[1])}
     keys = list(ans.keys())
     # print(list(ans.values())[:100])
