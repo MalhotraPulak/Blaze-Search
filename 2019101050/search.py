@@ -2,7 +2,7 @@ import sys
 from nltk.stem import SnowballStemmer
 from nltk.corpus import stopwords
 import nltk
-nltk.download('stopwords')
+# nltk.download('stopwords')
 stopword = stopwords.words('english')
 
 snowball_stemmer = SnowballStemmer('english')
@@ -20,7 +20,9 @@ field_map = {
         'x':2, 
         'v':3, 
         'u':4, 
-        't':5
+        't':5,
+        'p':2,
+        'q':1,
 };
 WEIGHTS = [5, 3, 1, 2, 1, 1]
 
@@ -30,17 +32,19 @@ import math
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed 
 from collections import Counter
+import multiprocessing as mp
+
 
 def process_word(word, field):
     local_dic = {}
-    print("searching", word, file=sys.stderr)
+    print("searching", word, "in field", field, file=sys.stderr)
     index_file_loc = f"./scratch/pulak/mergedIndex3/{word[0:3]}.txt"
     try:
         file = open(index_file_loc, "r")
     except:
         return
     lines = file.readlines()
-    print("done loading file in memory", file=sys.stderr)
+    # print("done loading file in memory", file=sys.stderr)
     tokens = []
     for line in lines:
         tokens = line.split(';', maxsplit=1)
@@ -52,12 +56,12 @@ def process_word(word, field):
     if tokens[0] != word:
         return
     tokens = tokens[1].strip().split(';') 
-    print("Found", word, file=sys.stderr)
+    # print("Found", word, file=sys.stderr)
     doc_list = tokens
     idf = math.log10(TOTAL_DOCS/ len(doc_list))
-    print("Idf is", idf)
-    field_names = list(field_map.keys()) + ['p', 'q'] 
-    print(len(tokens))
+    print("Idf for", word, "is", idf)
+    field_names = list(field_map.keys()) 
+    # print(len(tokens))
     for segment in doc_list:
         doc_id_freq = segment.split(":")
         doc_id = int(doc_id_freq[0], base=16)
@@ -67,12 +71,15 @@ def process_word(word, field):
         score = 0
         for c in freq_str:
             if c in field_names:
+                bonus = 1
+                if field_map[c] == field:
+                    bonus = 4
                 if c == 'p':
-                    score += WEIGHTS[2] * idf
+                    score += WEIGHTS[2] * idf * bonus
                 elif c == 'q':
-                    score += WEIGHTS[1] * idf
+                    score += WEIGHTS[1] * idf * bonus
                 if freq != 0 and last:
-                    score += WEIGHTS[field_map[last]] * (1 + math.log10(freq)) * idf
+                    score += WEIGHTS[field_map[last]] * (1 + math.log10(freq)) * idf * bonus
                     freq = 0
                 last = c
             else:
@@ -84,7 +91,7 @@ def process_word(word, field):
         else:
             local_dic[doc_id] += score
         
-    print("Done adding to global dic", len(local_dic))
+    print("Done adding to local dic", len(local_dic))
     return local_dic
   
 
@@ -92,7 +99,8 @@ def process_word(word, field):
 
 def process_query(query):
     # units = query.split()
-    executor = ThreadPoolExecutor()
+    # executor = ThreadPoolExecutor()
+    pool = mp.Pool(mp.cpu_count())
     txt = query.lower()
     punc_list = '\n\r\!"#$&*+,-./;?@\^_~)({}[]|=<>'
     # punctuation = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
@@ -101,14 +109,14 @@ def process_query(query):
     txt = txt.translate(t)
     t = str.maketrans(dict.fromkeys("`'", ""))
     txt = txt.translate(t)
-    # print("Text", txt)
+    print("Text", txt)
     tokens = txt.split()
     # print("Tokens", tokens)
 
-    tokens = [stem(token) for token in tokens if
-              token not in word_set and token.isalnum()]
+    # tokens = [stem(token) for token in tokens if
+    #           token not in word_set and token.isalnum()]
   
-    futures = []
+    results = []
     print("Tokens are:", tokens)
     field = -1
     for unit in tokens:
@@ -127,11 +135,17 @@ def process_query(query):
             elif tok == 'l':
                 field = 5
             unit = unit[2:]
-        futures.append(executor.submit(process_word, unit, field));
+        if unit in word_set:
+            continue
+        unit = stem(unit)
+        # futures.append(executor.submit(process_word, unit, field));
+        results.append(pool.apply_async(process_word, args=(unit, field)))
         # process_word(stem(unit.lower()), field) 
     dic = Counter()
-    for fut in as_completed(futures):
-        dic += Counter(fut.result())
+    for result in results:
+        dic += Counter(result.get())
+    # for fut in as_completed(futures):
+    #     dic += Counter(fut.result())
 
     ans = {k: v for k, v in sorted(dic.items(), key=lambda item: -item[1])}
     keys = list(ans.keys())
