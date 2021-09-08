@@ -1,14 +1,17 @@
 import sys
+import time
 from nltk.stem import SnowballStemmer
 from nltk.corpus import stopwords
-import nltk
 
+# incase stopwords arent downloaded
+# import nltk
 # nltk.download('stopwords')
 stopword = stopwords.words("english")
 
 snowball_stemmer = SnowballStemmer("english")
 
 word_set = {}
+out_file = None
 
 
 def stem(token):
@@ -38,7 +41,7 @@ import multiprocessing as mp
 
 def process_word(word, field):
     local_dic = {}
-    print("searching", word, "in field", field, file=sys.stderr)
+    # print("searching", word, "in field", field, file=sys.stderr)
     index_file_loc = f"./scratch/pulak/mergedIndex3/{word[0:3]}.txt"
     try:
         file = open(index_file_loc, "r")
@@ -60,7 +63,7 @@ def process_word(word, field):
     # print("Found", word, file=sys.stderr)
     doc_list = tokens
     idf = math.log10(TOTAL_DOCS / len(doc_list))
-    print("Idf for", word, "is", idf)
+    # print("Idf for", word, "is", idf)
     field_names = list(field_map.keys())
     # print(len(tokens))
     for segment in doc_list:
@@ -97,7 +100,7 @@ def process_word(word, field):
         else:
             local_dic[doc_id] += score
 
-    print("Done adding to local dic", len(local_dic))
+    # print("Done adding to local dic", len(local_dic))
     return local_dic
 
 
@@ -106,14 +109,13 @@ def process_query(query):
     # executor = ThreadPoolExecutor()
     pool = mp.Pool(mp.cpu_count())
     txt = query.lower()
-    punc_list = '\n\r\!"#$&*+,-./;?@\^_~)({}[]|=<>'
+    punc_list = '\n\r!"#$&*+,-./;?@^_~)({}[]|=<>\\'
     # punctuation = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
     # txt = txt.translate(str.maketrans('', '', string.punctuation))
     t = str.maketrans(dict.fromkeys(punc_list, " "))
     txt = txt.translate(t)
     t = str.maketrans(dict.fromkeys("`'", ""))
     txt = txt.translate(t)
-    print("Text", txt)
     tokens = txt.split()
     # print("Tokens", tokens)
 
@@ -154,28 +156,41 @@ def process_query(query):
     ans = {k: v for k, v in sorted(dic.items(), key=lambda item: -item[1])}
     keys = list(ans.keys())
     # print(list(ans.values())[:100])
-    print(keys[:10])
-    print()
+    # print(keys[:10])
+    # print()
     for doc_id in keys[:10]:
         title_no = int(doc_id) // 50000
         with open(f"titles/title{title_no}.txt", "r") as f:
             lines = f.readlines()
             line_no = (doc_id % 50000) * 2
-            print(lines[line_no][:-1], "{:.2f}".format(dic[doc_id]))
+            print(
+                lines[line_no][:-1].replace("!!", ", "),
+                "{:.2f}".format(dic[doc_id]),
+                file=out_file,
+            )
 
 
 def main():
-    global lines
-    query_string = sys.argv[1]
+    global out_file
+    query_file = sys.argv[1]
+    # query_string = sys.argv[1]
     # print(query_string)
     for word in stopword:
         word_set[word] = None
 
+    out_file = open("queries_op.txt", "w+")
+    queries = []
+    with open(query_file, "r") as f:
+        queries = f.readlines()
+
     global dic
-    try:
-        process_query(query_string)
-    except Exception as e:
-        print("Error", e)
+    for query in queries:
+        print(file=out_file)
+        start = time.time()
+        dic = {}
+        process_query(query)
+        end = time.time()
+        print("Time taken", math.floor(end - start), file=out_file)
 
 
 if __name__ == "__main__":
