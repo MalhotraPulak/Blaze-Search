@@ -2,16 +2,20 @@ import sys
 import time
 from nltk.stem import SnowballStemmer
 from nltk.corpus import stopwords
+import math
+from collections import Counter
+import multiprocessing as mp
 
 # incase stopwords arent downloaded
 # import nltk
 # nltk.download('stopwords')
+
 stopword = stopwords.words("english")
-
 snowball_stemmer = SnowballStemmer("english")
-
 word_set = {}
 out_file = None
+WEIGHTS = [5, 3, 1, 2, 1, 1]
+TOTAL_DOCS = 22000000
 
 
 def stem(token):
@@ -30,13 +34,6 @@ field_map = {
     "p": 2,
     "q": 1,
 }
-WEIGHTS = [5, 3, 1, 2, 1, 1]
-
-# dic = {}
-TOTAL_DOCS = 22000000
-import math
-from collections import Counter
-import multiprocessing as mp
 
 
 def process_word(word, field):

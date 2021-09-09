@@ -1,0 +1,48 @@
+
+18886207, List of Silicon Valley characters  78.63
+13211768, Silicon Valley (TV series)  77.36
+17623, Silicon Valley  77.23
+1009348, Carnegie Mellon Silicon Valley  73.27
+12486235, Silicon Valley Community Foundation  72.49
+18883293, Silicon Valley (season 2)  72.33
+15073764, Silicon Valley (season 1)  72.07
+18883315, Silicon Valley (season 4)  71.34
+18883321, Silicon Valley (season 5)  70.95
+18883307, Silicon Valley (season 3)  70.93
+Time taken 2
+
+431160, Harry Potter (character)  84.58
+7924167, Harry Potter and the Forbidden Journey  84.08
+7953211, The Wizarding World of Harry Potter (Universal Orlando Resort)  83.87
+1257290, Harry Potter  83.79
+10218427, Harry Potter and the Deathly Hallows – Part 2  83.30
+913526, Harry Potter and the Philosopher's Stone (video game)  83.27
+516855, Harry Potter and the Half-Blood Prince (film)  82.56
+10843989, The Wizarding World of Harry Potter  81.94
+3052908, Harry Potter (film series)  81.70
+3647280, Harry Potter and the Deathly Hallows – Part 1  81.59
+Time taken 2
+
+674287, Dehradun  72.05
+2825840, Dehradun Airport  65.50
+13922613, Dehradun Municipal Corporation  64.34
+13678947, Rajiv Gandhi International Cricket Stadium, Dehradun  62.33
+16805904, 2018 Dehradun Municipal Corporation election  61.09
+10523276, Marshall School, Dehradun  60.77
+20946140, Draft:Shivalik College Dehradun  60.25
+12891880, Dehradun railway station  60.24
+1696714, Dehradun district  60.13
+3065463, Dehradun Cantonment  60.01
+Time taken 1
+
+13754717, 2021 ICC Men's T20 World Cup  108.99
+3229206, ICC Men's T20 World Cup  106.27
+16265818, 2020 ICC Women's T20 World Cup  101.65
+17744592, 2019 ICC Men's T20 World Cup Qualifier  101.33
+17919934, 2022 ICC Men's T20 World Cup  99.00
+17810593, 2018–19 ICC T20 World Cup Europe Qualifier  96.83
+17818183, 2018–19 ICC T20 World Cup Africa Qualifier  96.32
+18970682, 2020 ICC Women's T20 World Cup Final  96.16
+17367338, 2020–2023 ICC Cricket World Cup Super League  96.11
+11006936, ICC Women's T20 World Cup  95.50
+Time taken 5

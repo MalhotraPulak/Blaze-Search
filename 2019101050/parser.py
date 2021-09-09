@@ -12,6 +12,7 @@ snowball_stemmer = SnowballStemmer("english")
 regex = re.compile(r"(\d+|\s+|=|\|)")
 
 # all_tokens = set()
+all_tokens = set()
 
 mystopwords = [
     "www",
@@ -265,7 +266,7 @@ class WikiParser(xml.sax.ContentHandler):
             print(self.currentPage.doc_no, file=sys.stderr)
         body = " ".join(self.currentPage.body)
 
-        categories_str = re.findall("(?<=\[\[Category:)(.*?)(?=\]\])", body)
+        categories_str = re.findall("(?<=[[Category:)(.*?)(?=]])", body)
         ref_type_1 = []
         # print("ref type 1 ", ref_type_1)
         ref_type_3 = re.findall(r"<ref(.+?)>", body)
