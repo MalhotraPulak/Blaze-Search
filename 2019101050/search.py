@@ -1,5 +1,5 @@
-import sys
 import time
+import sys
 from nltk.stem import SnowballStemmer
 from nltk.corpus import stopwords
 import math
@@ -60,7 +60,7 @@ def process_word(word, field):
     # print("Found", word, file=sys.stderr)
     doc_list = tokens
     idf = math.log10(TOTAL_DOCS / len(doc_list))
-    # print("Idf for", word, "is", idf)
+    print("Idf for", word, "is", idf)
     field_names = list(field_map.keys())
     # print(len(tokens))
     for segment in doc_list:
