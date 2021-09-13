@@ -15,7 +15,7 @@ stopword = stopwords.words("english")
 snowball_stemmer = SnowballStemmer("english")
 word_set = {}
 out_file = None
-WEIGHTS = [5, 3, 1, 2, 1, 1]
+WEIGHTS = [4, 3, 1, 3, 2, 2]
 TOTAL_DOCS = 22000000
 
 
@@ -71,22 +71,35 @@ def process_word(word, field):
         last = ""
         freq = 0
         score = 0
+        sol = False
+        if doc_id == 4845579:
+            sol = True
+            print(freq_str)
+
         for c in freq_str:
             if c in field_names:
                 bonus = 1
                 if field_map[c] == field:
-                    bonus = 4
+                    bonus = 10
                 if c == "p":
                     score += WEIGHTS[2] * idf * bonus
                 elif c == "q":
                     score += WEIGHTS[1] * idf * bonus
                 if freq != 0 and last:
+                    if field_map[last] == field:
+                        bonus = 10
+                    else:
+                        bonus = 1
+                    if sol:
+                        print("before", score, freq, bonus)
                     score += (
                         WEIGHTS[field_map[last]]
                         * (1 + math.log10(freq))
                         * idf
                         * bonus
                     )
+                    if sol:
+                        print("after", score)
                     freq = 0
                 last = c
             else:
@@ -186,6 +199,7 @@ def main():
         print(file=out_file)
         start = time.time()
         dic = {}
+        print(query, file=out_file)
         process_query(query)
         end = time.time()
         print("Time taken", math.floor(end - start), file=out_file)
