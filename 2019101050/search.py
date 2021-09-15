@@ -176,7 +176,7 @@ def process_query(query):
             line_no = (doc_id % 50000) * 2
             print(
                 lines[line_no][:-1].replace("!!", ", "),
-                "{:.2f}".format(dic[doc_id]),
+                # "{:.2f}".format(dic[doc_id]),
                 file=out_file,
             )
 
@@ -199,10 +199,10 @@ def main():
         print(file=out_file)
         start = time.time()
         dic = {}
-        print(query, file=out_file)
+        # print(query, file=out_file)
         process_query(query)
         end = time.time()
-        print("Time taken", math.floor(end - start), file=out_file)
+        print("Time taken", end - start, file=out_file)
 
 
 if __name__ == "__main__":
