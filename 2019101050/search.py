@@ -15,7 +15,7 @@ stopword = stopwords.words("english")
 snowball_stemmer = SnowballStemmer("english")
 word_set = {}
 out_file = None
-WEIGHTS = [2, 2, 1, 3, 2, 2]
+WEIGHTS = [2, 1.75, 1, 0.75, 0.5, 0.5]
 TOTAL_DOCS = 22000000
 
 
@@ -118,7 +118,7 @@ def process_word(word, field):
 def process_query(query):
     # units = query.split()
     # executor = ThreadPoolExecutor()
-    pool = mp.Pool(mp.cpu_count())
+    pool = mp.Pool(11)
     txt = query.lower()
     punc_list = '\n\r!"#$&*+,-./;?@^_~)({}[]|=<>\\'
     # punctuation = r"""!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"""
@@ -163,6 +163,7 @@ def process_query(query):
         dic += Counter(result.get())
     # for fut in as_completed(futures):
     #     dic += Counter(fut.result())
+    pool.close()
 
     ans = {k: v for k, v in sorted(dic.items(), key=lambda item: -item[1])}
     keys = list(ans.keys())
