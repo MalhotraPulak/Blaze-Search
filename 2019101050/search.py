@@ -200,7 +200,7 @@ def main():
         print(file=out_file)
         start = time.time()
         dic = {}
-        # print(query, file=out_file)
+        print(query, file=out_file)
         process_query(query)
         end = time.time()
         print("Time taken", end - start, file=out_file)
