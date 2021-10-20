@@ -21,7 +21,7 @@ Create a python virtual environment
 ```bash
 python3 -m venv venv
 pip3 install -r requirements.txt
-cd 2019101050
+cd src 
 ```
 
 #### Create an index
